@@ -7,6 +7,7 @@
 #include "libmesh/explicit_system.h"
 #include "libmesh/string_to_enum.h"
 #include "libmesh/transient_system.h"
+#include "ibtk/IBTK_MPI.h"
 
 #include <boost/multi_array.hpp>
 
@@ -18,6 +19,26 @@ static Timer* t_interpolateToBoundary = nullptr;
 
 namespace LS
 {
+template <typename Array>
+void print(std::ostream& os, const Array& A)
+{
+  typename Array::const_iterator i;
+  os << "[";
+  for (i = A.begin(); i != A.end(); ++i) {
+    print(os, *i);
+    if (boost::next(i) != A.end())
+      os << ',';
+  }
+  os << "]";
+}
+template<> void print<double>(std::ostream& os, const double& x)
+{
+    os << x;
+}
+template<> void print<unsigned int>(std::ostream& os, const unsigned int& x)
+{
+    os << x;
+}
 SBIntegrator::SBIntegrator(std::string object_name,
                            Pointer<Database> input_db,
                            Mesh* mesh,
@@ -120,8 +141,10 @@ SBIntegrator::initializeFEEquationSystems()
     {
         for (const auto& sf_name : d_sf_names)
         {
-            auto& surface_sys = eq_sys->add_system<TransientExplicitSystem>(sf_name);
-            surface_sys.add_variable(sf_name, FEType());
+            auto& cur_surface_sys = eq_sys->add_system<ExplicitSystem>(sf_name + "::CURRENT");
+            cur_surface_sys.add_variable(sf_name + "_CURRENT", FEType());
+            auto& old_surface_sys = eq_sys->add_system<ExplicitSystem>(sf_name + "::OLD");
+            old_surface_sys.add_variable(sf_name + "_OLD", FEType());
         }
 
         for (const auto& fl_name : d_fl_names)
@@ -155,71 +178,111 @@ SBIntegrator::integrateHierarchy(Pointer<VariableContext> ctx, const double curr
         const double dt = new_time - current_time;
         // Solve ODE on surface
         EquationSystems* eq_sys = d_fe_data_manager->getEquationSystems();
-        auto& sf_base_sys = eq_sys->get_system<TransientExplicitSystem>(sf_name);
-        DofMap& sf_base_dof_map = sf_base_sys.get_dof_map();
-        NumericVector<double>* sf_base_cur_vec = sf_base_sys.solution.get();
-        NumericVector<double>* sf_base_old_vec = sf_base_sys.older_local_solution.get();
+        auto& sf_cur_base_sys = eq_sys->get_system<ExplicitSystem>(sf_name + "::CURRENT");
+        // NOTE: we assume both sf_cur and sf_old have the same DofMap.
+        DofMap& sf_base_dof_map = sf_cur_base_sys.get_dof_map();
+        NumericVector<double>* sf_base_cur_vec = d_fe_data_manager->buildGhostedSolutionVector(sf_name + "::CURRENT");
+        auto sf_base_cur_petsc_vec = dynamic_cast<PetscVector<double>*>(sf_base_cur_vec);
+        double* sf_base_cur_vals = sf_base_cur_petsc_vec->get_array();
+
+        NumericVector<double>* sf_base_old_vec = d_fe_data_manager->buildGhostedSolutionVector(sf_name + "::OLD");
+        auto sf_base_old_petsc_vec = dynamic_cast<PetscVector<double>*>(sf_base_old_vec);
+        const double* sf_base_old_vals = sf_base_old_petsc_vec->get_array_read();
 
         // Get the NumericVector for all associated systems.
         // TODO: We should check that the dof_maps are all the same, otherwise we need to grab them.
         const std::vector<std::string>& sf_sf_vec = d_sf_sf_map[sf_name];
         const std::vector<std::string>& sf_fl_vec = d_sf_fl_map[sf_name];
-        std::vector<NumericVector<double>*> sf_cur_vecs, sf_old_vecs, fl_vecs;
+        std::vector<PetscVector<double>*> sf_cur_petsc_vecs, sf_old_petsc_vecs, fl_petsc_vecs;
+        std::vector<double*> sf_cur_vals;
+        std::vector<const double*> sf_old_vals, fl_vals;
         std::vector<DofMap*> sf_dof_maps, fl_dof_maps;
         for (const auto& fl_name : sf_fl_vec)
         {
             System& fl_sys = eq_sys->get_system(fl_name);
             fl_dof_maps.push_back(&fl_sys.get_dof_map());
-            fl_vecs.push_back(fl_sys.solution.get());
+            NumericVector<double>* fl_vec = d_fe_data_manager->buildGhostedSolutionVector(fl_name);
+            auto fl_petsc_vec = dynamic_cast<PetscVector<double>*>(fl_vec);
+            fl_petsc_vecs.push_back(fl_petsc_vec);
+            fl_vals.push_back(fl_petsc_vec->get_array_read());
         }
         for (const auto& sf_name : sf_sf_vec)
         {
-            auto& sf_sys = eq_sys->get_system<TransientExplicitSystem>(sf_name);
+            auto& sf_sys = eq_sys->get_system<ExplicitSystem>(sf_name + "::CURRENT");
+            // NOTE: we assume both sf_cur and sf_old have the same DofMap.
             sf_dof_maps.push_back(&sf_sys.get_dof_map());
-            sf_cur_vecs.push_back(sf_sys.old_local_solution.get());
-            sf_old_vecs.push_back(sf_sys.older_local_solution.get());
+
+            NumericVector<double>* sf_cur_vec = d_fe_data_manager->buildGhostedSolutionVector(sf_name + "::CURRENT");
+            auto sf_cur_petsc_vec = dynamic_cast<PetscVector<double>*>(sf_cur_vec);
+            sf_cur_petsc_vecs.push_back(sf_cur_petsc_vec);
+            sf_cur_vals.push_back(sf_cur_petsc_vec->get_array());
+
+            NumericVector<double>* sf_old_vec = d_fe_data_manager->buildGhostedSolutionVector(sf_name + "::OLD");
+            auto sf_old_petsc_vec = dynamic_cast<PetscVector<double>*>(sf_old_vec);
+            sf_old_petsc_vecs.push_back(sf_old_petsc_vec);
+            sf_old_vals.push_back(sf_old_petsc_vec->get_array_read());
         }
 
         // Assume we are on the finest level.
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(d_hierarchy->getFinestLevelNumber());
         const std::vector<std::vector<Node*>>& active_patch_node_map = d_fe_data_manager->getActivePatchNodeMap();
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        int local_patch_num = 0;
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++local_patch_num)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            const int patch_num = patch->getPatchNumber();
-            const std::vector<Node*>& active_patch_nodes = active_patch_node_map[patch_num];
+            const std::vector<Node*>& active_patch_nodes = active_patch_node_map[local_patch_num];
+            if (active_patch_nodes.size() == 0) continue;
 
             for (const auto& node : active_patch_nodes)
             {
                 // Integrate solution to new value. Use Adams-Bashforth-2
                 std::vector<dof_id_type> fl_dofs, sf_dofs, sf_base_dofs;
-                std::vector<double> fl_vals, sf_cur_vals, sf_old_vals;
-                std::vector<double> sf_base_cur_vals, sf_base_new_vals;
+                std::vector<double> fl_nodal_vals, sf_cur_nodal_vals, sf_old_nodal_vals;
+                std::vector<double> sf_base_cur_nodal_vals, sf_base_new_nodal_vals;
                 for (unsigned int l = 0; l < sf_sf_vec.size(); ++l)
                 {
                     IBTK::get_nodal_dof_indices(*sf_dof_maps[l], node, 0, sf_dofs);
-                    sf_cur_vals.push_back((*sf_cur_vecs[l])(sf_dofs[0]));
-                    sf_old_vals.push_back((*sf_old_vecs[l])(sf_dofs[0]));
+                    sf_cur_nodal_vals.push_back(sf_cur_vals[l][sf_cur_petsc_vecs[l]->map_global_to_local_index(sf_dofs[0])]);
+                    sf_old_nodal_vals.push_back(sf_old_vals[l][sf_old_petsc_vecs[l]->map_global_to_local_index(sf_dofs[0])]);
                 }
                 for (unsigned int l = 0; l < sf_fl_vec.size(); ++l)
                 {
                     IBTK::get_nodal_dof_indices(*fl_dof_maps[l], node, 0, fl_dofs);
-                    fl_vals.push_back((*fl_vecs[l])(fl_dofs[0]));
+                    fl_nodal_vals.push_back(fl_vals[l][fl_petsc_vecs[l]->map_global_to_local_index(fl_dofs[0])]);
                 }
                 IBTK::get_nodal_dof_indices(sf_base_dof_map, node, 0, sf_base_dofs);
-                const double sf_old_val = (*sf_base_old_vec)(sf_base_dofs[0]);
-                double sf_cur_val = (*sf_base_cur_vec)(sf_base_dofs[0]);
+                const double sf_old_val = sf_base_old_vals[sf_base_old_petsc_vec->map_global_to_local_index(sf_base_dofs[0])];
+                double sf_cur_val = sf_base_cur_vals[sf_base_cur_petsc_vec->map_global_to_local_index(sf_base_dofs[0])];
                 //                sf_cur_val += dt * d_sf_reaction_fcn_map[sf_name](sf_cur_val, fl_vals, sf_cur_vals,
                 //                current_time, d_sf_ctx_map[sf_name]);
+//                plog << "node: " << *node << "\n";
+//                plog << "sf_cur_val: " << sf_cur_val << "\n";
+//                plog << "sf_old_val: " << sf_old_val << "\n";
+//                plog << "fl_nodal_vals: " << fl_nodal_vals[0] << "\n";
                 sf_cur_val +=
                     dt * (1.5 * d_sf_reaction_fcn_map[sf_name](
-                                    sf_cur_val, fl_vals, sf_cur_vals, current_time, d_sf_ctx_map[sf_name]) -
+                                    sf_cur_val, fl_nodal_vals, sf_cur_nodal_vals, current_time, d_sf_ctx_map[sf_name]) -
                           0.5 * d_sf_reaction_fcn_map[sf_name](
-                                    sf_old_val, fl_vals, sf_old_vals, current_time - dt, d_sf_ctx_map[sf_name]));
-                sf_base_cur_vec->set(sf_base_dofs[0], sf_cur_val);
+                                    sf_old_val, fl_nodal_vals, sf_old_nodal_vals, current_time - dt, d_sf_ctx_map[sf_name]));
+                sf_base_cur_vals[sf_base_cur_petsc_vec->map_global_to_local_index(sf_base_dofs[0])] = sf_cur_val;
             }
         }
-        sf_base_cur_vec->close();
+
+        sf_base_cur_petsc_vec->restore_array();
+        sf_base_old_petsc_vec->restore_array();
+        for (auto& fl_vec : fl_petsc_vecs)
+        {
+            fl_vec->restore_array();
+        }
+        for (auto& sf_vec : sf_cur_petsc_vecs)
+        {
+            sf_vec->restore_array();
+        }
+        for (auto& sf_vec : sf_old_petsc_vecs)
+        {
+            sf_vec->restore_array();
+        }
+        sf_base_cur_petsc_vec->localize(*sf_cur_base_sys.current_local_solution);
     }
     LS_TIMER_STOP(t_integrateHierarchy);
 }
@@ -231,10 +294,11 @@ SBIntegrator::beginTimestepping(const double /*current_time*/, const double /*ne
     EquationSystems* eq_sys = d_fe_data_manager->getEquationSystems();
     for (const auto& sf_name : d_sf_names)
     {
-        TransientExplicitSystem& sf_sys = eq_sys->get_system<TransientExplicitSystem>(sf_name);
-        *sf_sys.older_local_solution = *sf_sys.old_local_solution;
-        *sf_sys.old_local_solution = *sf_sys.current_local_solution;
-        sf_sys.update();
+        ExplicitSystem& sf_cur_sys = eq_sys->get_system<ExplicitSystem>(sf_name + "::CURRENT");
+        ExplicitSystem& sf_old_sys = eq_sys->get_system<ExplicitSystem>(sf_name + "::OLD");
+        *sf_old_sys.solution = *sf_cur_sys.solution;
+        sf_old_sys.update();
+        sf_cur_sys.update();
     }
 
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
@@ -250,8 +314,10 @@ SBIntegrator::endTimestepping(const double /*current_time*/, const double /*new_
     EquationSystems* eq_sys = d_fe_data_manager->getEquationSystems();
     for (const auto& sf_name : d_sf_names)
     {
-        TransientExplicitSystem& sf_sys = eq_sys->get_system<TransientExplicitSystem>(sf_name);
-        sf_sys.update();
+        ExplicitSystem& sf_cur_sys = eq_sys->get_system<ExplicitSystem>(sf_name + "::CURRENT");
+        ExplicitSystem& sf_old_sys = eq_sys->get_system<ExplicitSystem>(sf_name + "::OLD");
+        sf_cur_sys.update();
+        sf_old_sys.update();
     }
 
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
@@ -292,24 +358,25 @@ SBIntegrator::interpolateToBoundary(Pointer<CellVariable<NDIM, double>> fl_var,
     System& X_system = eq_sys->get_system(d_fe_data_manager->COORDINATES_SYSTEM_NAME);
     const DofMap& X_dof_map = X_system.get_dof_map();
 
-    NumericVector<double>* X_vec = X_system.current_local_solution.get();
-    NumericVector<double>* fl_vec = fl_system.solution.get();
+    NumericVector<double>* X_vec = d_fe_data_manager->buildGhostedCoordsVector();
+    NumericVector<double>* fl_vec = d_fe_data_manager->buildGhostedSolutionVector(fl_name);
 
     auto X_petsc_vec = dynamic_cast<PetscVector<double>*>(X_vec);
     TBOX_ASSERT(X_petsc_vec != nullptr);
     const double* const X_local_soln = X_petsc_vec->get_array_read();
 
     fl_vec->zero();
+    auto fl_petsc_vec = dynamic_cast<PetscVector<double>*>(fl_vec);
+    double* const fl_local_soln = fl_petsc_vec->get_array();
 
     // Loop over patches and interpolate solution to the boundary
     // Assume we are only doing this on the finest level
     Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(d_hierarchy->getFinestLevelNumber());
     const std::vector<std::vector<Node*>>& active_patch_node_map = d_fe_data_manager->getActivePatchNodeMap();
-    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+    int local_patch_num = 0;
+    for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++local_patch_num)
     {
         Pointer<Patch<NDIM>> patch = level->getPatch(p());
-        const int local_patch_num = patch->getPatchNumber();
-
         const std::vector<Node*>& patch_nodes = active_patch_node_map[local_patch_num];
         const size_t num_active_patch_nodes = patch_nodes.size();
         if (!num_active_patch_nodes) continue;
@@ -322,9 +389,8 @@ SBIntegrator::interpolateToBoundary(Pointer<CellVariable<NDIM, double>> fl_var,
 
         // Store the value of X at the nodes that are inside the current patch
         std::vector<dof_id_type> fl_node_idxs;
-        std::vector<double> fl_node, X_node;
+        std::vector<double> X_node;
         fl_node_idxs.reserve(n_vars * num_active_patch_nodes);
-        fl_node.reserve(n_vars * num_active_patch_nodes);
         X_node.reserve(NDIM * num_active_patch_nodes);
         std::vector<dof_id_type> fl_idxs, X_idxs;
         IBTK::Point X;
@@ -341,7 +407,6 @@ SBIntegrator::interpolateToBoundary(Pointer<CellVariable<NDIM, double>> fl_var,
             }
             if (inside_patch)
             {
-                fl_node.resize(fl_node.size() + n_vars, 0.0);
                 X_node.insert(X_node.end(), &X[0], &X[0] + NDIM);
                 for (unsigned int i = 0; i < n_vars; ++i)
                 {
@@ -351,21 +416,19 @@ SBIntegrator::interpolateToBoundary(Pointer<CellVariable<NDIM, double>> fl_var,
             }
         }
 
-        TBOX_ASSERT(fl_node.size() <= n_vars * num_active_patch_nodes);
         TBOX_ASSERT(X_node.size() <= NDIM * num_active_patch_nodes);
         TBOX_ASSERT(fl_node_idxs.size() <= n_vars * num_active_patch_nodes);
 
-        if (fl_node.empty()) continue;
+        if (fl_node_idxs.empty()) continue;
 
         // Now we can interpolate from the fluid to the structure.
         Pointer<CellData<NDIM, double>> fl_data = patch->getPatchData(d_scr_idx);
         Pointer<NodeData<NDIM, double>> ls_data = patch->getPatchData(d_ls_idx);
         Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(d_vol_idx);
-        for (size_t i = 0; i < fl_node.size(); ++i)
+        for (size_t i = 0; i < fl_node_idxs.size(); ++i)
         {
             // Use a MLS linear approximation to evaluate data on structure
             const CellIndex<NDIM> cell_idx = IndexUtilities::getCellIndex(&X_node[NDIM * i], pgeom, patch->getBox());
-            const CellIndex<NDIM>& idx_low = patch->getBox().lower();
             VectorNd x_loc = {
                 X_node[NDIM * i],
                 X_node[NDIM * i + 1]
@@ -374,12 +437,21 @@ SBIntegrator::interpolateToBoundary(Pointer<CellVariable<NDIM, double>> fl_var,
                 X_node[NDIM * i + 2]
 #endif
             };
-            fl_node[i] = d_rbf_reconstruct.reconstructOnIndex(x_loc, cell_idx, *fl_data, patch);
+            plog << "global index: " << fl_node_idxs[i] << "\n";
+            plog << "local  index: " <<fl_petsc_vec->map_global_to_local_index(fl_node_idxs[i]) << "\n";
+            plog << "Filling in index: " << fl_node_idxs[i] << " with value " << d_rbf_reconstruct.reconstructOnIndex(x_loc, cell_idx, *fl_data, patch) << "\n";
+            fl_local_soln[fl_petsc_vec->map_global_to_local_index(fl_node_idxs[i])] = d_rbf_reconstruct.reconstructOnIndex(x_loc, cell_idx, *fl_data, patch);
         }
-        fl_vec->add_vector(fl_node, fl_node_idxs);
     }
     X_petsc_vec->restore_array();
-    fl_vec->close();
+    fl_petsc_vec->restore_array();
+    plog << "Before localization:\n";
+    fl_petsc_vec->print(plog);
+    fl_system.current_local_solution->print(plog);
+    fl_petsc_vec->localize(*fl_system.current_local_solution);
+    plog << "After localization:\n";
+    fl_petsc_vec->print_global(plog);
+    fl_system.current_local_solution->print_global(plog);
     LS_TIMER_STOP(t_interpolateToBoundary);
 }
 } // namespace LS

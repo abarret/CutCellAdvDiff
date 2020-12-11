@@ -307,6 +307,7 @@ SemiLagrangianAdvIntegrator::initializeHierarchyIntegrator(Pointer<PatchHierarch
                                                            Pointer<GriddingAlgorithm<NDIM>> gridding_alg)
 {
     if (d_integrator_is_initialized) return;
+    plog << d_object_name << "::initializeHierarchyIntegrator() initializing hierarchy \n";
     d_hierarchy = hierarchy;
     d_gridding_alg = gridding_alg;
     Pointer<CartesianGridGeometry<NDIM>> grid_geom = d_hierarchy->getGridGeometry();
@@ -406,6 +407,7 @@ SemiLagrangianAdvIntegrator::preprocessIntegrateHierarchy(const double current_t
                                                           const double new_time,
                                                           const int num_cycles)
 {
+    plog << d_object_name << ": beginning preprocess integrate hierarchy\n";
     LS_TIMER_START(t_preprocess)
     AdvDiffHierarchyIntegrator::preprocessIntegrateHierarchy(current_time, new_time, num_cycles);
     const double dt = new_time - current_time;
@@ -530,6 +532,7 @@ SemiLagrangianAdvIntegrator::preprocessIntegrateHierarchy(const double current_t
         l++;
     }
     LS_TIMER_STOP(t_preprocess);
+    plog << d_object_name << ": finished preprocess integrate hierarchy\n";
 }
 
 void
@@ -718,6 +721,7 @@ SemiLagrangianAdvIntegrator::initializeCompositeHierarchyDataSpecialized(const d
                                                                          const bool initial_time)
 {
     AdvDiffHierarchyIntegrator::initializeCompositeHierarchyDataSpecialized(current_time, initial_time);
+    plog << d_object_name << "::initializeCompositeHierarchyDataSpecialized() initializing hierarchy \n";
 
     if (initial_time)
     {

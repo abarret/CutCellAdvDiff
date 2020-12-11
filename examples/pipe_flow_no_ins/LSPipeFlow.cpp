@@ -106,14 +106,17 @@ LSPipeFlow::updateVolumeAreaSideLS(int vol_idx,
         System& X_sys = eq_sys->get_system(fe_data_manager->COORDINATES_SYSTEM_NAME);
         FEDataManager::SystemDofMapCache& X_dof_map_cache =
             *fe_data_manager->getDofMapCache(fe_data_manager->COORDINATES_SYSTEM_NAME);
-        NumericVector<double>* X_vec = X_sys.solution.get();
+        NumericVector<double>* X_vec = fe_data_manager->buildGhostedCoordsVector();
+        auto X_petsc_vec = dynamic_cast<PetscVector<double>*>(X_vec);
+        const double* X_vals = X_petsc_vec->get_array_read();
 
         IBTK::Point x_min, x_max;
         VectorValue<double> n;
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        int local_patch_num = 0;
+        for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++local_patch_num)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            const std::vector<Elem*>& active_patch_elems = active_patch_elem_map[patch->getPatchNumber()];
+            const std::vector<Elem*>& active_patch_elems = active_patch_elem_map[local_patch_num];
             if (active_patch_elems.size() == 0) continue;
 
             Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(vol_idx);
@@ -142,7 +145,6 @@ LSPipeFlow::updateVolumeAreaSideLS(int vol_idx,
             {
                 const auto& X_dof_indices = X_dof_map_cache.dof_indices(elem);
                 IBTK::get_values_for_interpolation(x_node, *X_vec, X_dof_indices);
-
                 const unsigned int n_node = elem->n_nodes();
                 std::vector<libMesh::Point> X_node_cache(n_node), x_node_cache(n_node);
                 x_min = IBTK::Point::Constant(std::numeric_limits<double>::max());
@@ -215,10 +217,13 @@ LSPipeFlow::updateVolumeAreaSideLS(int vol_idx,
                                 // Make sure we haven't found this intersection before
                                 const PointAxisSide pt_ax_si = std::make_pair(p, std::make_pair(axis, upper_lower));
                                 auto pt_compare = [pt_ax_si](PointAxisSide a) -> bool {
-                                    if (pt_ax_si.first == a.first)
-                                        return true;
-                                    else
-                                        return false;
+                                    bool same = true;
+                                    for (int d = 0; same && d < NDIM; ++d)
+                                    {
+                                        if (std::abs(pt_ax_si.first(d) - a.first(d)) >= 1.0e-8)
+                                            same = false;
+                                    }
+                                    return same;
                                 };
                                 if (std::find_if(index_intersect_map[i_c].begin(),
                                                  index_intersect_map[i_c].end(),
@@ -414,11 +419,11 @@ LSPipeFlow::updateVolumeAreaSideLS(int vol_idx,
                     {
                         for (int y = 0; y < 2; ++y)
                         {
-                            if (node_dist[x][y] <= 0.0) ++num_neg;
+                            if (node_dist[x][y] < 0.0) ++num_neg;
                         }
                     }
                     // ElemCutter does not treat intersections near nodes correctly!!
-                    // We can compute volumes by sudividing our domain into triangles.
+                    // We can compute volumes by subdividing our domain into triangles.
                     if (num_neg == 1)
                     {
                         // If there is only a single "negative node", then we have a triangle.
@@ -432,9 +437,9 @@ LSPipeFlow::updateVolumeAreaSideLS(int vol_idx,
                         {
                             for (int y = 0; y < 2; ++y)
                             {
-                                if (node_dist[x][y] <= 0.0)
+                                if (node_dist[x][y] < 0.0)
                                 {
-                                    pt2 << static_cast<double>(idx(0) + x), static_cast<double>(idx(1) + y);
+                                    pt2 << static_cast<double>(idx(0)- idx_low(0) + x), static_cast<double>(idx(1) - idx_low(1) + y);
                                 }
                             }
                         }
@@ -451,15 +456,16 @@ LSPipeFlow::updateVolumeAreaSideLS(int vol_idx,
                         pt1 << ((pt_ax_si_vec[1].first)(0) - x_low[0]) / dx[0],
                             ((pt_ax_si_vec[1].first)(1) - x_low[1]) / dx[1];
                         pt3.setZero();
+                        pt2.setZero();
                         for (int x = 0; x < 2; ++x)
                         {
                             for (int y = 0; y < 2; ++y)
                             {
-                                if (node_dist[x][y] <= 0.0)
+                                if (node_dist[x][y] < 0.0)
                                 {
                                     // pt3 is on the line with pt0 that is perpendicular to a coordinate axis.
                                     VectorNd pt;
-                                    pt << static_cast<double>(idx(0) + x), static_cast<double>(idx(1) + y);
+                                    pt << static_cast<double>(idx(0) - idx_low(0) + x), static_cast<double>(idx(1) - idx_low(1) + y);
                                     if (std::abs((pt - pt0).dot(VectorNd::UnitX())) < sqrt(DBL_EPSILON) ||
                                         std::abs((pt - pt0).dot(VectorNd::UnitY())) < sqrt(DBL_EPSILON))
                                         pt3 = pt;
@@ -491,9 +497,9 @@ LSPipeFlow::updateVolumeAreaSideLS(int vol_idx,
                         {
                             for (int y = 0; y < 2; ++y)
                             {
-                                if (node_dist[x][y] > 0.0)
+                                if (node_dist[x][y] >= 0.0)
                                 {
-                                    pt2 << static_cast<double>(idx(0) + x), static_cast<double>(idx(1) + y);
+                                    pt2 << static_cast<double>(idx(0) - idx_low(0) + x), static_cast<double>(idx(1) - idx_low(1) + y);
                                 }
                             }
                         }
@@ -641,14 +647,6 @@ LSPipeFlow::updateVolumeAreaSideLS(int vol_idx,
             }
         }
     }
-    plog << "Checking volume data for NaNs\n";
-    DebuggingUtilities::checkCellDataForNaNs(vol_idx, d_hierarchy, true);
-    plog << "\nChecking area data for NaNs\n";
-    DebuggingUtilities::checkCellDataForNaNs(area_idx, d_hierarchy, true);
-    plog << "\nChecking side data for NaNs\n";
-    DebuggingUtilities::checkSideDataForNaNs(side_idx, d_hierarchy, true);
-    plog << "\nChecking LS data for NaNs\n";
-    DebuggingUtilities::checkNodeDataForNaNs(phi_idx, d_hierarchy, true);
     LS_TIMER_STOP(t_updateVolumeAreaSideLS);
 }
 

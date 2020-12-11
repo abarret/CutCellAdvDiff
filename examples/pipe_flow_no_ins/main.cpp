@@ -149,7 +149,6 @@ g_fcn(double Q_bdry, const std::vector<double>& fl_vals, const std::vector<doubl
 double
 sf_ode(double q, const std::vector<double>& fl_vals, const std::vector<double>& sf_vals, double time, void* ctx)
 {
-    plog << "fl_vals[0]: " << fl_vals[0] << "\n";
     return k_on * (sf_max - q) * fl_vals[0] - k_off * q;
 }
 
@@ -391,9 +390,6 @@ main(int argc, char* argv[])
         }
         else
         {
-            //            vol_fcn = new LSFromMesh("LSFromMesh", patch_hierarchy, &vol_mesh,
-            //            ib_method_ops->getFEDataManager(VOL_MESH_ID), true);
-            //            adv_diff_integrator->setFEDataManagerNeedsInitialization(ib_method_ops->getFEDataManager(VOL_MESH_ID));
             vol_fcn = new LSPipeFlow("LSPipeFlow",
                                      patch_hierarchy,
                                      &lower_mesh_bdry,
@@ -498,9 +494,6 @@ main(int argc, char* argv[])
         const int u_draw_idx = var_db->registerVariableAndContext(u_draw, var_db->getContext("Scratch"));
         visit_data_writer->registerPlotQuantity("velocity", "VECTOR", u_draw_idx);
 
-        FESurfaceDistanceEvaluator surface_distance_eval(
-            "FESurfaceDistanceEvaulator", patch_hierarchy, vol_vol_mesh, vol_mesh, 1, true);
-
         ib_method_ops->initializeFEData();
         // Initialize hierarchy configuration and data on all patches.
         adv_diff_integrator->initializePatchHierarchy(patch_hierarchy, gridding_algorithm);
@@ -531,7 +524,7 @@ main(int argc, char* argv[])
         double loop_time = adv_diff_integrator->getIntegratorTime();
         if (dump_viz_data && uses_visit)
         {
-            pout << "\n\nWriting visualization files...\n\n";
+            pout << "\nWriting visualization files...\n\n";
             adv_diff_integrator->setupPlotData();
             adv_diff_integrator->allocatePatchData(u_draw_idx, 0.0);
             u_fcn->setDataOnPatchHierarchy(u_draw_idx, u_draw, patch_hierarchy, loop_time);
@@ -548,10 +541,6 @@ main(int argc, char* argv[])
                 vol_mesh_io->write_timestep(
                     vol_exodus_filename, *vol_eq_sys, iteration_num / viz_dump_interval + 1, loop_time);
             }
-            const int vol_idx = var_db->mapVariableAndContextToIndex(adv_diff_integrator->getVolumeVariable(ls_var),
-                                                                     adv_diff_integrator->getCurrentContext());
-            checkConservation(
-                ib_method_ops->getFEDataManager(REACTION_MESH_ID), sf_name, Q_idx, vol_idx, patch_hierarchy, loop_time);
         }
 
         // Main time step loop.
@@ -603,14 +592,6 @@ main(int argc, char* argv[])
                     vol_mesh_io->write_timestep(
                         vol_exodus_filename, *vol_eq_sys, iteration_num / viz_dump_interval + 1, loop_time);
                 }
-                const int vol_idx = var_db->mapVariableAndContextToIndex(adv_diff_integrator->getVolumeVariable(ls_var),
-                                                                         adv_diff_integrator->getCurrentContext());
-                checkConservation(ib_method_ops->getFEDataManager(REACTION_MESH_ID),
-                                  sf_name,
-                                  Q_idx,
-                                  vol_idx,
-                                  patch_hierarchy,
-                                  loop_time);
             }
             if (dump_restart_data && (iteration_num % restart_dump_interval == 0 || last_step))
             {

@@ -15,21 +15,17 @@
 
 #include <SAMRAI_config.h>
 
-// PETSC INCLUDES
 #include <petsc.h>
 
-// IBTK INCLUDES
 #include <ibtk/CartExtrapPhysBdryOp.h>
 #include <ibtk/HierarchyMathOps.h>
 #include <ibtk/IBTK_MPI.h>
 
-// LIBMESH INCLUDES
 #include <libmesh/equation_systems.h>
 #include <libmesh/exact_solution.h>
 #include <libmesh/mesh.h>
-using namespace libMesh;
+#include <libmesh/exodusII_io.h>
 
-// SAMRAI INCLUDES
 #include <ibamr/app_namespaces.h>
 
 #include "ibtk/AppInitializer.h"
@@ -57,9 +53,7 @@ using namespace libMesh;
 #include <VariableDatabase.h>
 #include <VisItDataWriter.h>
 
-using namespace IBTK;
-using namespace SAMRAI;
-using namespace std;
+#include "ibamr/app_namespaces.h"
 
 int
 main(int argc, char* argv[])

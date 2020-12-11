@@ -3,16 +3,16 @@ LX = 8.0
 LY = 4.0
 MAX_LEVELS = 1                            // maximum number of levels in locally refined grid
 REF_RATIO  = 2                            // refinement ratio between levels
-N = 64                                    // coarsest grid spacing
+N = 256                                    // coarsest grid spacing
 
 SKIP_CUT_CELLS = 2
 
 Main {
 
-coarse_hier_dump_interval = 16
-fine_hier_dump_interval = 32
-coarse_hier_dump_dirname = "coarse/hier_data"
-fine_hier_dump_dirname = "medium/hier_data"
+coarse_hier_dump_interval = 64
+fine_hier_dump_interval = 128
+coarse_hier_dump_dirname = "fine/hier_data_IB2d"
+fine_hier_dump_dirname = "finer/hier_data_IB2d"
 
 // log file parameters
    log_file_name               = "convergence.log"
@@ -26,10 +26,10 @@ fine_hier_dump_dirname = "medium/hier_data"
 
 // restart dump parameters
    restart_dump_interval       = 0
-   restart_dump_dirname        = "restart_adv_diff2d"
+   restart_dump_dirname        = "convergence_restart"
 
    data_dump_interval          = 1
-   data_dump_dirname           = "hier_data_IB2d"
+   data_dump_dirname           = "convergence_hier"
 
 }
 
@@ -37,5 +37,5 @@ CartesianGeometry {
    domain_boxes = [ (0,0),(2*N - 1,N - 1) ]
    x_lo = 0.0,0.0
    x_up = LX,LY
-   periodic_dimension = 1,1
+   periodic_dimension = 0,0
 }

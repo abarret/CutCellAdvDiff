@@ -1,4 +1,5 @@
 #include "ibtk/IndexUtilities.h"
+#include "ibtk/IBTK_MPI.h"
 
 #include "LS/SBBoundaryConditions.h"
 #include "LS/utility_functions.h"
@@ -141,7 +142,7 @@ SBBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>>
     System& X_system = eq_sys->get_system(d_fe_data_manager->COORDINATES_SYSTEM_NAME);
     DofMap& X_dof_map = X_system.get_dof_map();
     FEType X_fe_type = X_dof_map.variable_type(0);
-    NumericVector<double>* X_vec = X_system.solution.get();
+    NumericVector<double>* X_vec = d_fe_data_manager->buildGhostedCoordsVector();;
     auto X_petsc_vec = dynamic_cast<PetscVector<double>*>(X_vec);
     TBOX_ASSERT(X_petsc_vec != nullptr);
     const double* const X_local_soln = X_petsc_vec->get_array_read();
@@ -154,21 +155,21 @@ SBBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>>
     {
         System& fl_sys = eq_sys->get_system(fl_name);
         fl_dof_maps.push_back(&fl_sys.get_dof_map());
-        fl_vecs.push_back(fl_sys.solution.get());
+        fl_vecs.push_back(d_fe_data_manager->buildGhostedSolutionVector(fl_name));
     }
 
     for (const auto sf_name : d_sf_names)
     {
-        auto& sf_sys = eq_sys->get_system<TransientExplicitSystem>(sf_name);
+        auto& sf_sys = eq_sys->get_system<ExplicitSystem>(sf_name + "::OLD");
         sf_dof_maps.push_back(&sf_sys.get_dof_map());
-        sf_vecs.push_back(sf_sys.old_local_solution.get());
+        sf_vecs.push_back(d_fe_data_manager->buildGhostedSolutionVector(sf_name + "::OLD"));
     }
 
     // Get base system
     System& Q_sys = eq_sys->get_system(d_sys_name);
     DofMap& Q_dof_map = Q_sys.get_dof_map();
     FEType Q_fe_type = Q_dof_map.variable_type(0);
-    NumericVector<double>* Q_vec = Q_sys.solution.get();
+    NumericVector<double>* Q_vec = d_fe_data_manager->buildGhostedSolutionVector(d_sys_name);
     TBOX_ASSERT(Q_fe_type == X_fe_type);
 
     std::unique_ptr<FEBase> fe = FEBase::build(d_mesh->mesh_dimension(), X_fe_type);
@@ -185,11 +186,11 @@ SBBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>>
     IBTK::Point x_min, x_max;
     const std::vector<std::vector<Elem*>>& active_patch_element_map = d_fe_data_manager->getActivePatchElementMap();
 
-    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+    int local_patch_num = 0;
+    for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++local_patch_num)
     {
         Pointer<Patch<NDIM>> patch = level->getPatch(p());
-        const int patch_num = patch->getPatchNumber();
-        const std::vector<Elem*>& patch_elems = active_patch_element_map[patch_num];
+        const std::vector<Elem*>& patch_elems = active_patch_element_map[local_patch_num];
         const size_t num_active_patch_elems = patch_elems.size();
         if (num_active_patch_elems == 0) continue;
 
@@ -552,8 +553,8 @@ SBBoundaryConditions::interpolateToBoundary(const int Q_idx,
     System& X_system = eq_sys->get_system(d_fe_data_manager->COORDINATES_SYSTEM_NAME);
     const DofMap& X_dof_map = X_system.get_dof_map();
 
-    NumericVector<double>* X_vec = X_system.current_local_solution.get();
-    NumericVector<double>* Q_vec = Q_system.solution.get();
+    NumericVector<double>* X_vec = d_fe_data_manager->buildGhostedCoordsVector();
+    NumericVector<double>* Q_vec = d_fe_data_manager->buildGhostedSolutionVector(Q_sys_name);
 
     auto X_petsc_vec = dynamic_cast<PetscVector<double>*>(X_vec);
     TBOX_ASSERT(X_petsc_vec != nullptr);
@@ -565,10 +566,10 @@ SBBoundaryConditions::interpolateToBoundary(const int Q_idx,
     // Assume we are only doing this on the finest level
     Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(hierarchy->getFinestLevelNumber());
     const std::vector<std::vector<Node*>>& active_patch_node_map = d_fe_data_manager->getActivePatchNodeMap();
-    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+    int local_patch_num = 0;
+    for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++local_patch_num)
     {
         Pointer<Patch<NDIM>> patch = level->getPatch(p());
-        const int local_patch_num = patch->getPatchNumber();
 
         const std::vector<Node*>& patch_nodes = active_patch_node_map[local_patch_num];
         const size_t num_active_patch_nodes = patch_nodes.size();
@@ -638,6 +639,7 @@ SBBoundaryConditions::interpolateToBoundary(const int Q_idx,
     }
     X_petsc_vec->restore_array();
     Q_vec->close();
+    Q_vec->localize(*Q_system.current_local_solution);
     LS_TIMER_STOP(t_interpolateToBoundary);
 }
 
