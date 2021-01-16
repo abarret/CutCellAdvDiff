@@ -120,6 +120,11 @@ public:
                                        bool skip_synchronize_new_state_data,
                                        int num_cycles = 1) override;
 
+    inline SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> getPredictorContext()
+    {
+        return d_predictor_context;
+    }
+
 protected:
     void initializeCompositeHierarchyDataSpecialized(double current_time, bool initial_time) override;
     void regridHierarchyBeginSpecialized() override;
@@ -247,6 +252,8 @@ private:
     double weight(double r);
 
     RBFPolyOrder d_rbf_poly_order = RBFPolyOrder::UNKNOWN_ORDER;
+
+    SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_predictor_context;
 }; // Class SemiLagrangianAdvIntegrator
 } // Namespace LS
 

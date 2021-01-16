@@ -4,6 +4,7 @@
 #include "ibamr/AdvDiffHierarchyIntegrator.h"
 
 #include "LS/LSCutCellBoundaryConditions.h"
+#include "LS/SemiLagrangianAdvIntegrator.h"
 
 class InsideBoundaryConditions : public LS::LSCutCellBoundaryConditions
 {
@@ -11,9 +12,14 @@ public:
     InsideBoundaryConditions(const std::string& object_name,
                              SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
                              SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> out_var,
-                             SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> integrator);
+                             SAMRAI::tbox::Pointer<LS::SemiLagrangianAdvIntegrator> integrator);
 
     ~InsideBoundaryConditions();
+
+    inline void setContext(SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> ctx)
+    {
+        d_ctx = ctx;
+    }
 
     /*!
      * \brief Deleted default constructor.
@@ -39,7 +45,8 @@ public:
 
 private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_out_var;
-    SAMRAI::tbox::Pointer<IBAMR::AdvDiffHierarchyIntegrator> d_integrator;
+    SAMRAI::tbox::Pointer<LS::SemiLagrangianAdvIntegrator> d_integrator;
+    SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_ctx;
 
     double d_k1 = std::numeric_limits<double>::quiet_NaN();
 };

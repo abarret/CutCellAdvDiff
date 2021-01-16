@@ -13,7 +13,6 @@
 #include "LS/LSCutCellLaplaceOperator.h"
 #include "LS/LSFindCellVolume.h"
 #include "LS/LSFromLevelSet.h"
-#include "LS/QInitial.h"
 #include "LS/SemiLagrangianAdvIntegrator.h"
 #include "LS/utility_functions.h"
 
@@ -306,6 +305,7 @@ main(int argc, char* argv[])
         time_integrator->setHelmholtzSolver(Q_in_var, Q_in_helmholtz_solver);
         Pointer<InsideBoundaryConditions> in_bdry_oper = new InsideBoundaryConditions(
             "InsideBdryOper", app_initializer->getComponentDatabase("BdryConds"), Q_out_var, time_integrator);
+        in_bdry_oper->setContext(time_integrator->getPredictorContext());
         rhs_in_oper->setBoundaryConditionOperator(in_bdry_oper);
         sol_in_oper->setBoundaryConditionOperator(in_bdry_oper);
 
@@ -320,6 +320,7 @@ main(int argc, char* argv[])
         time_integrator->setHelmholtzSolver(Q_out_var, Q_out_helmholtz_solver);
         Pointer<OutsideBoundaryConditions> out_bdry_oper = new OutsideBoundaryConditions(
             "OutsideBdryOper", app_initializer->getComponentDatabase("BdryConds"), Q_in_var, time_integrator);
+        out_bdry_oper->setContext(time_integrator->getPredictorContext());
         rhs_out_oper->setBoundaryConditionOperator(out_bdry_oper);
         sol_out_oper->setBoundaryConditionOperator(out_bdry_oper);
 

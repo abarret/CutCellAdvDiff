@@ -178,6 +178,7 @@ SemiLagrangianAdvIntegrator::SemiLagrangianAdvIntegrator(const std::string& obje
     auto var_db = VariableDatabase<NDIM>::getDatabase();
     d_path_idx = var_db->registerVariableAndContext(d_path_var, var_db->getContext(d_object_name + "::PathContext"));
     d_adv_data.setFlag(d_path_idx);
+    d_predictor_context = var_db->getContext(d_object_name + "::PredictorContext");
 
     // We need to register our own scratch variable since we need more ghost cells.
     d_Q_big_scr_idx =
@@ -226,6 +227,9 @@ void
 SemiLagrangianAdvIntegrator::registerTransportedQuantity(Pointer<CellVariable<NDIM, double>> Q_var, bool Q_output)
 {
     AdvDiffHierarchyIntegrator::registerTransportedQuantity(Q_var, Q_output);
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    const int Q_predict_idx = var_db->registerVariableAndContext(Q_var, d_predictor_context, IntVector<NDIM>(2));
+    d_scratch_data.setFlag(Q_predict_idx);
 }
 
 void
@@ -668,49 +672,68 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
         sb_integrator->endTimestepping(current_time, d_use_strang_splitting ? half_time : new_time);
     }
 
-    for (const auto& Q_var : d_Q_var)
+    for (int iter = 0; iter < 2; ++iter)
     {
-        const int Q_cur_idx = var_db->mapVariableAndContextToIndex(Q_var, getCurrentContext());
-        const int Q_scr_idx = var_db->mapVariableAndContextToIndex(Q_var, getScratchContext());
+        for (const auto& Q_var : d_Q_var)
+        {
+            const int Q_cur_idx = var_db->mapVariableAndContextToIndex(Q_var, getCurrentContext());
+            const int Q_new_idx = var_db->mapVariableAndContextToIndex(Q_var, getNewContext());
+            const int Q_predict_idx = var_db->mapVariableAndContextToIndex(Q_var, d_predictor_context);
+            if (iter == 0)
+            {
+                d_hier_cc_data_ops->copyData(Q_predict_idx, Q_cur_idx);
+            }
+            else
+            {
+                d_hier_cc_data_ops->copyData(Q_predict_idx, Q_new_idx);
+            }
+        }
+        for (const auto& Q_var : d_Q_var)
+        {
+            const int Q_cur_idx = var_db->mapVariableAndContextToIndex(Q_var, getCurrentContext());
+            const int Q_scr_idx = var_db->mapVariableAndContextToIndex(Q_var, getScratchContext());
+            const int Q_new_idx = var_db->mapVariableAndContextToIndex(Q_var, getNewContext());
 
-        const Pointer<NodeVariable<NDIM, double>>& ls_var = d_Q_ls_map[Q_var];
-        const size_t l = distance(d_ls_vars.begin(), std::find(d_ls_vars.begin(), d_ls_vars.end(), ls_var));
-        const Pointer<CellVariable<NDIM, double>>& vol_var = d_vol_vars[l];
-        const Pointer<CellVariable<NDIM, double>>& area_var = d_area_vars[l];
-        const Pointer<SideVariable<NDIM, double>>& side_var = d_side_vars[l];
-        const int ls_cur_idx = var_db->mapVariableAndContextToIndex(ls_var, getCurrentContext());
-        const int vol_cur_idx = var_db->mapVariableAndContextToIndex(vol_var, getCurrentContext());
-        const int area_cur_idx = var_db->mapVariableAndContextToIndex(area_var, getCurrentContext());
-        const int side_cur_idx = var_db->mapVariableAndContextToIndex(side_var, getCurrentContext());
-        // Fill ghost cells for ls_node_cur
-        using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
-        std::vector<ITC> ghost_cell_comps(1);
-        ghost_cell_comps[0] = ITC(ls_cur_idx, "LINEAR_REFINE", false, "NONE", "LINEAR");
-        HierarchyGhostCellInterpolation hier_ghost_cell;
-        hier_ghost_cell.initializeOperatorState(ghost_cell_comps, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
-        hier_ghost_cell.fillData(current_time);
+            const Pointer<NodeVariable<NDIM, double>>& ls_var = d_Q_ls_map[Q_var];
+            const size_t l = distance(d_ls_vars.begin(), std::find(d_ls_vars.begin(), d_ls_vars.end(), ls_var));
+            const Pointer<CellVariable<NDIM, double>>& vol_var = d_vol_vars[l];
+            const Pointer<CellVariable<NDIM, double>>& area_var = d_area_vars[l];
+            const Pointer<SideVariable<NDIM, double>>& side_var = d_side_vars[l];
+            const int ls_cur_idx = var_db->mapVariableAndContextToIndex(ls_var, getCurrentContext());
+            const int vol_cur_idx = var_db->mapVariableAndContextToIndex(vol_var, getCurrentContext());
+            const int area_cur_idx = var_db->mapVariableAndContextToIndex(area_var, getCurrentContext());
+            const int side_cur_idx = var_db->mapVariableAndContextToIndex(side_var, getCurrentContext());
+            // Fill ghost cells for ls_node_cur
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comps(1);
+            ghost_cell_comps[0] = ITC(ls_cur_idx, "LINEAR_REFINE", false, "NONE", "LINEAR");
+            HierarchyGhostCellInterpolation hier_ghost_cell;
+            hier_ghost_cell.initializeOperatorState(
+                ghost_cell_comps, d_hierarchy, 0, d_hierarchy->getFinestLevelNumber());
+            hier_ghost_cell.fillData(current_time);
 
-        // Copy current data to scratch
-        d_hier_cc_data_ops->copyData(Q_scr_idx, Q_cur_idx);
+            // Copy current data to scratch
+            d_hier_cc_data_ops->copyData(Q_scr_idx, Q_cur_idx);
 
-        // First do a diffusion update.
-        // Note diffusion update fills in "New" context
-        diffusionUpdate(Q_var,
-                        ls_cur_idx,
-                        ls_var,
-                        vol_cur_idx,
-                        vol_var,
-                        area_cur_idx,
-                        area_var,
-                        side_cur_idx,
-                        side_var,
-                        current_time,
-                        d_use_strang_splitting ? half_time : new_time);
+            // First do a diffusion update.
+            // Note diffusion update fills in "New" context
+            diffusionUpdate(Q_var,
+                            ls_cur_idx,
+                            ls_var,
+                            vol_cur_idx,
+                            vol_var,
+                            area_cur_idx,
+                            area_var,
+                            side_cur_idx,
+                            side_var,
+                            current_time,
+                            d_use_strang_splitting ? half_time : new_time);
 
-        plog << d_object_name + "::integrateHierarchy() finished diffusion update for variable: " << Q_var->getName()
-             << "\n";
+            plog << d_object_name + "::integrateHierarchy() finished diffusion update for variable: "
+                 << Q_var->getName() << "\n";
 
-        // TODO: Should we synchronize hierarchy?
+            // TODO: Should we synchronize hierarchy?
+        }
     }
 
     // Update Level sets
@@ -837,44 +860,62 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
             sb_integrator->integrateHierarchy(getCurrentContext(), half_time, new_time);
             sb_integrator->endTimestepping(half_time, new_time);
         }
-        for (const auto& Q_var : d_Q_var)
+        for (int iter = 0; iter < 2; ++iter)
         {
-            const int Q_cur_idx = var_db->mapVariableAndContextToIndex(Q_var, getCurrentContext());
-            const int Q_scr_idx = var_db->mapVariableAndContextToIndex(Q_var, getScratchContext());
-            const int Q_new_idx = var_db->mapVariableAndContextToIndex(Q_var, getNewContext());
+            for (const auto& Q_var : d_Q_var)
+            {
+                const int Q_new_idx = var_db->mapVariableAndContextToIndex(Q_var, getNewContext());
+                const int Q_cur_idx = var_db->mapVariableAndContextToIndex(Q_var, getCurrentContext());
+                const int Q_predict_idx = var_db->mapVariableAndContextToIndex(Q_var, d_predictor_context);
+                if (iter == 0)
+                {
+                    d_hier_cc_data_ops->copyData(Q_cur_idx, Q_new_idx);
+                    d_hier_cc_data_ops->copyData(Q_predict_idx, Q_cur_idx);
+                }
+                else
+                {
+                    d_hier_cc_data_ops->copyData(Q_predict_idx, Q_new_idx);
+                }
+            }
+            for (const auto& Q_var : d_Q_var)
+            {
+                const int Q_cur_idx = var_db->mapVariableAndContextToIndex(Q_var, getCurrentContext());
+                const int Q_scr_idx = var_db->mapVariableAndContextToIndex(Q_var, getScratchContext());
+                const int Q_new_idx = var_db->mapVariableAndContextToIndex(Q_var, getNewContext());
 
-            const Pointer<NodeVariable<NDIM, double>>& ls_var = d_Q_ls_map[Q_var];
-            const size_t l = distance(d_ls_vars.begin(), std::find(d_ls_vars.begin(), d_ls_vars.end(), ls_var));
-            const Pointer<CellVariable<NDIM, double>>& vol_var = d_vol_vars[l];
-            const Pointer<CellVariable<NDIM, double>>& area_var = d_area_vars[l];
-            const Pointer<SideVariable<NDIM, double>>& side_var = d_side_vars[l];
-            const int ls_new_idx = var_db->mapVariableAndContextToIndex(ls_var, getNewContext());
-            const int area_new_idx = var_db->mapVariableAndContextToIndex(area_var, getNewContext());
-            const int vol_new_idx = var_db->mapVariableAndContextToIndex(vol_var, getNewContext());
-            const int side_new_idx = var_db->mapVariableAndContextToIndex(side_var, getNewContext());
+                const Pointer<NodeVariable<NDIM, double>>& ls_var = d_Q_ls_map[Q_var];
+                const size_t l = distance(d_ls_vars.begin(), std::find(d_ls_vars.begin(), d_ls_vars.end(), ls_var));
+                const Pointer<CellVariable<NDIM, double>>& vol_var = d_vol_vars[l];
+                const Pointer<CellVariable<NDIM, double>>& area_var = d_area_vars[l];
+                const Pointer<SideVariable<NDIM, double>>& side_var = d_side_vars[l];
+                const int ls_new_idx = var_db->mapVariableAndContextToIndex(ls_var, getNewContext());
+                const int area_new_idx = var_db->mapVariableAndContextToIndex(area_var, getNewContext());
+                const int vol_new_idx = var_db->mapVariableAndContextToIndex(vol_var, getNewContext());
+                const int side_new_idx = var_db->mapVariableAndContextToIndex(side_var, getNewContext());
 
-            // Copy current data to scratch
-            d_hier_cc_data_ops->copyData(Q_cur_idx, Q_new_idx);
-            d_hier_cc_data_ops->copyData(Q_scr_idx, Q_new_idx);
+                // Copy current data to scratch
+                //                d_hier_cc_data_ops->copyData(Q_cur_idx, Q_new_idx);
+                d_hier_cc_data_ops->copyData(Q_scr_idx, Q_cur_idx);
 
-            // First do a diffusion update.
-            // Note diffusion update fills in "New" context
-            diffusionUpdate(Q_var,
-                            ls_new_idx,
-                            ls_var,
-                            vol_new_idx,
-                            vol_var,
-                            area_new_idx,
-                            area_var,
-                            side_new_idx,
-                            side_var,
-                            half_time,
-                            new_time);
+                // First do a diffusion update.
+                // Note diffusion update fills in "New" context
+                diffusionUpdate(Q_var,
+                                ls_new_idx,
+                                ls_var,
+                                vol_new_idx,
+                                vol_var,
+                                area_new_idx,
+                                area_var,
+                                side_new_idx,
+                                side_var,
+                                half_time,
+                                new_time);
 
-            plog << d_object_name + "::integrateHierarchy() finished diffusion update for variable: "
-                 << Q_var->getName() << "\n";
+                plog << d_object_name + "::integrateHierarchy() finished diffusion update for variable: "
+                     << Q_var->getName() << "\n";
 
-            // TODO: Should we synchronize hierarchy?
+                // TODO: Should we synchronize hierarchy?
+            }
         }
     }
     LS_TIMER_STOP(t_integrate_hierarchy);

@@ -14,6 +14,11 @@ public:
 
     ~OutsideBoundaryConditions();
 
+    inline void setContext(SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> ctx)
+    {
+        d_ctx = ctx;
+    }
+
     /*!
      * \brief Deleted default constructor.
      */
@@ -45,6 +50,7 @@ public:
 private:
     SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> d_in_var;
     SAMRAI::tbox::Pointer<LS::SemiLagrangianAdvIntegrator> d_integrator;
+    SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_ctx;
 
     int d_ls_in_idx = IBTK::invalid_index;
     int d_area_in_idx = IBTK::invalid_index;
