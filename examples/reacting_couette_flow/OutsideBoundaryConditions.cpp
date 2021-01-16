@@ -28,7 +28,7 @@ OutsideBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, dou
     TBOX_ASSERT(d_ls_idx > 0 && d_vol_idx > 0 && d_area_idx > 0);
 
     auto var_db = VariableDatabase<NDIM>::getDatabase();
-    const int in_idx = var_db->mapVariableAndContextToIndex(d_in_var, d_integrator->getCurrentContext());
+    const int in_idx = var_db->mapVariableAndContextToIndex(d_in_var, d_ctx);
 
     const double sgn = d_D / std::abs(d_D);
 

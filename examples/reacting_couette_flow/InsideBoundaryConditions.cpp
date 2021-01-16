@@ -3,7 +3,7 @@
 InsideBoundaryConditions::InsideBoundaryConditions(const std::string& object_name,
                                                    Pointer<Database> input_db,
                                                    Pointer<CellVariable<NDIM, double>> out_var,
-                                                   Pointer<AdvDiffHierarchyIntegrator> integrator)
+                                                   Pointer<LS::SemiLagrangianAdvIntegrator> integrator)
     : LSCutCellBoundaryConditions(object_name), d_out_var(out_var), d_integrator(integrator)
 {
     d_k1 = input_db->getDouble("k1");
@@ -28,7 +28,7 @@ InsideBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, doub
     TBOX_ASSERT(d_ls_idx > 0 && d_vol_idx > 0 && d_area_idx > 0);
 
     auto var_db = VariableDatabase<NDIM>::getDatabase();
-    const int out_idx = var_db->mapVariableAndContextToIndex(d_out_var, d_integrator->getCurrentContext());
+    const int out_idx = var_db->mapVariableAndContextToIndex(d_out_var, d_ctx);
 
     const double sgn = d_D / std::abs(d_D);
 
