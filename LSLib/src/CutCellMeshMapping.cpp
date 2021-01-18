@@ -2,6 +2,8 @@
 
 #include "LS/CutCellMeshMapping.h"
 
+#include "ibamr/app_namespaces.h"
+
 namespace LS
 {
 CutCellMeshMapping::CutCellMeshMapping(std::string object_name,

@@ -11,6 +11,8 @@
 #include "libmesh/petsc_matrix.h"
 #include "libmesh/transient_system.h"
 
+#include "ibamr/app_namespaces.h"
+
 namespace
 {
 static Timer* t_interpolateToBoundary = nullptr;

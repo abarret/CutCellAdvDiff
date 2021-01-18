@@ -1,7 +1,6 @@
 #include "ibamr/AdvDiffCUIConvectiveOperator.h"
 #include "ibamr/AdvDiffPPMConvectiveOperator.h"
 #include "ibamr/AdvDiffWavePropConvectiveOperator.h"
-#include "ibamr/app_namespaces.h"
 
 #include "LS/LSCartGridFunction.h"
 #include "LS/SBBoundaryConditions.h"
@@ -15,6 +14,8 @@
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
+
+#include "ibamr/app_namespaces.h"
 
 extern "C"
 {

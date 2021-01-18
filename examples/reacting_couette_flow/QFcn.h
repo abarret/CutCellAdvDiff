@@ -16,16 +16,12 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-// IBTK INCLUDES
 #include <ibtk/CartGridFunction.h>
 #include <ibtk/ibtk_utilities.h>
 
-// SAMRAI INCLUDES
 #include <CartesianGridGeometry.h>
 
-// C++ namespace delcarations
 #include <ibamr/AdvDiffHierarchyIntegrator.h>
-#include <ibamr/app_namespaces.h>
 
 #include "LS/IntegrateFunction.h"
 #include "LS/LSCartGridFunction.h"
@@ -43,7 +39,7 @@ public:
     /*!
      * \brief Constructor.
      */
-    QFcn(const string& object_name, Pointer<Database> input_db);
+    QFcn(const std::string& object_name, SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
     /*!
      * \brief Destructor.
@@ -126,7 +122,7 @@ private:
     /*!
      * Read input values, indicated above, from given database.
      */
-    void getFromInput(Pointer<Database> db);
+    void getFromInput(SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> db);
 
     bool d_solve_for_average = false;
 

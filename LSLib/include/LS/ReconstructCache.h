@@ -69,14 +69,14 @@ public:
     virtual void cacheData() = 0;
 
     virtual double reconstructOnIndex(IBTK::VectorNd x_loc,
-                                      const hier::Index<NDIM>& idx,
-                                      const CellData<NDIM, double>& Q_data,
+                                      const SAMRAI::hier::Index<NDIM>& idx,
+                                      const SAMRAI::pdat::CellData<NDIM, double>& Q_data,
                                       SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch) = 0;
 
 protected:
     int d_stencil_size = 2;
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
-    std::vector<std::map<PatchIndexPair, Eigen::FullPivHouseholderQR<MatrixXd>>> d_qr_matrix_vec;
+    std::vector<std::map<PatchIndexPair, Eigen::FullPivHouseholderQR<IBTK::MatrixXd>>> d_qr_matrix_vec;
     bool d_update_weights = true;
     bool d_use_centroids = true;
     int d_vol_idx = IBTK::invalid_index, d_ls_idx = IBTK::invalid_index;

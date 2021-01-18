@@ -49,8 +49,8 @@ public:
     void cacheData() override;
 
     double reconstructOnIndex(IBTK::VectorNd x_loc,
-                              const hier::Index<NDIM>& idx,
-                              const CellData<NDIM, double>& Q_data,
+                              const SAMRAI::hier::Index<NDIM>& idx,
+                              const SAMRAI::pdat::CellData<NDIM, double>& Q_data,
                               SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch) override;
 };
 } // namespace LS

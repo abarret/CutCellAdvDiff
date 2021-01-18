@@ -11,15 +11,16 @@
 //
 // ---------------------------------------------------------------------
 
+#include <ibamr/config.h>
+
 #include "LS/SetLSValue.h"
 #include "LS/utility_functions.h"
-/////////////////////////////// INCLUDES /////////////////////////////////////
-
-#include <ibamr/config.h>
 
 #include <SAMRAI_config.h>
 
 #include <array>
+
+#include <ibamr/app_namespaces.h>
 
 namespace LS
 {

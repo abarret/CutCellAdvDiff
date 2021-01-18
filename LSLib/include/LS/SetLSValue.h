@@ -16,15 +16,10 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-// IBTK INCLUDES
 #include <ibtk/CartGridFunction.h>
 #include <ibtk/ibtk_utilities.h>
 
-// SAMRAI INCLUDES
 #include <CartesianGridGeometry.h>
-
-// C++ namespace delcarations
-#include <ibamr/app_namespaces.h>
 
 namespace LS
 {
@@ -39,7 +34,9 @@ public:
     /*!
      * \brief Constructor.
      */
-    SetLSValue(const string& object_name, Pointer<GridGeometry<NDIM>> grid_geom, Pointer<Database> input_db);
+    SetLSValue(const std::string& object_name,
+               SAMRAI::tbox::Pointer<SAMRAI::hier::GridGeometry<NDIM>> grid_geom,
+               SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
     /*!
      * \brief Destructor.
@@ -97,23 +94,23 @@ private:
     /*!
      * Read input values, indicated above, from given database.
      */
-    void getFromInput(Pointer<Database> db);
+    void getFromInput(SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> db);
 
     /*
      * The object name is used as a handle to databases stored in restart files
      * and for error reporting purposes.
      */
-    string d_object_name;
+    std::string d_object_name;
 
     /*
      * The grid geometry.
      */
-    Pointer<CartesianGridGeometry<NDIM>> d_grid_geom;
+    SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianGridGeometry<NDIM>> d_grid_geom;
 
     /*
      * The initialization type.
      */
-    string d_interface_type = "ANNULUS";
+    std::string d_interface_type = "ANNULUS";
 
     IBTK::VectorNd d_U;
 
@@ -122,10 +119,10 @@ private:
      */
     double d_R1 = 0.25;
 #if (NDIM == 2)
-    VectorNd d_center = { 1.509, 1.521 };
+    IBTK::VectorNd d_center = { 1.509, 1.521 };
 #endif
 #if (NDIM == 3)
-    VectorNd d_center = { 1.509, 1.521, 1.514 };
+    IBTK::VectorNd d_center = { 1.509, 1.521, 1.514 };
 #endif
 
     bool d_extended_box = false;

@@ -10,6 +10,8 @@
 
 #include <boost/multi_array.hpp>
 
+#include "ibamr/app_namespaces.h"
+
 namespace
 {
 static Timer* t_applyBoundaryCondition = nullptr;

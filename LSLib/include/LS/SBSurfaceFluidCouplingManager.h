@@ -237,7 +237,8 @@ public:
      *
      * @{
      */
-    inline const BdryConds& getFLBdryConditionFcns(const Pointer<CellVariable<NDIM, double>>& fl_var)
+    inline const BdryConds&
+    getFLBdryConditionFcns(const SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>>& fl_var)
     {
         return getFLBdryConditionFcns(fl_var->getName());
     }

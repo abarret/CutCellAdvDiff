@@ -1,6 +1,8 @@
 #ifndef included_LS_LSFromMesh
 #define included_LS_LSFromMesh
 
+#include "ibtk/config.h"
+
 #include "ibamr/AdvDiffSemiImplicitHierarchyIntegrator.h"
 #include "ibamr/ConvectiveOperator.h"
 #include "ibamr/ibamr_utilities.h"
@@ -9,8 +11,6 @@
 #include "ibtk/CartGridFunction.h"
 #include "ibtk/FEDataManager.h"
 #include "ibtk/IndexUtilities.h"
-#include "ibtk/app_namespaces.h"
-#include "ibtk/config.h"
 
 #include "LS/LSFindCellVolume.h"
 

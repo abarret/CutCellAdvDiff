@@ -5,6 +5,8 @@
 
 #include "LSPipeFlow.h"
 
+#include "ibamr/app_namespaces.h"
+
 // FORTRAN ROUTINES
 #if (NDIM == 2)
 #define SIGN_SWEEP_FC IBAMR_FC_FUNC(signsweep2dn, SIGNSWEEP2D)

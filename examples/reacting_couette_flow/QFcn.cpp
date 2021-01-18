@@ -11,15 +11,15 @@
 //
 // ---------------------------------------------------------------------
 
-#include "QFcn.h"
-
-/////////////////////////////// INCLUDES /////////////////////////////////////
-
 #include <ibamr/config.h>
+
+#include "QFcn.h"
 
 #include <SAMRAI_config.h>
 
 #include <array>
+
+#include "ibamr/app_namespaces.h"
 
 namespace LS
 {

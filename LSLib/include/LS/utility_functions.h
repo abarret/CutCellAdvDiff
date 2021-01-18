@@ -64,27 +64,27 @@ area_fraction(const double reg_area, const double phi_ll, const double phi_lu, c
     return 0.5 * std::abs(A) * reg_area;
 }
 
-inline VectorNd
-midpoint_value(const VectorNd& pt0, const double& phi0, const VectorNd& pt1, const double& phi1)
+inline IBTK::VectorNd
+midpoint_value(const IBTK::VectorNd& pt0, const double& phi0, const IBTK::VectorNd& pt1, const double& phi1)
 {
     return pt0 * phi1 / (phi1 - phi0) - pt1 * phi0 / (phi1 - phi0);
 }
 
 #if (NDIM == 2)
 inline IBTK::VectorNd
-find_cell_centroid(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>& ls_data)
+find_cell_centroid(const SAMRAI::pdat::CellIndex<NDIM>& idx, const SAMRAI::pdat::NodeData<NDIM, double>& ls_data)
 {
     IBTK::VectorNd center;
     center.setZero();
     std::vector<IBTK::VectorNd> X_pts;
 
-    double phi_ll = ls_data(NodeIndex<NDIM>(idx, IntVector<NDIM>(0, 0)));
+    double phi_ll = ls_data(SAMRAI::pdat::NodeIndex<NDIM>(idx, SAMRAI::hier::IntVector<NDIM>(0, 0)));
     if (std::abs(phi_ll) < s_eps) phi_ll = phi_ll < 0.0 ? -s_eps : s_eps;
-    double phi_ul = ls_data(NodeIndex<NDIM>(idx, IntVector<NDIM>(1, 0)));
+    double phi_ul = ls_data(SAMRAI::pdat::NodeIndex<NDIM>(idx, SAMRAI::hier::IntVector<NDIM>(1, 0)));
     if (std::abs(phi_ul) < s_eps) phi_ul = phi_ul < 0.0 ? -s_eps : s_eps;
-    double phi_uu = ls_data(NodeIndex<NDIM>(idx, IntVector<NDIM>(1, 1)));
+    double phi_uu = ls_data(SAMRAI::pdat::NodeIndex<NDIM>(idx, SAMRAI::hier::IntVector<NDIM>(1, 1)));
     if (std::abs(phi_uu) < s_eps) phi_uu = phi_uu < 0.0 ? -s_eps : s_eps;
-    double phi_lu = ls_data(NodeIndex<NDIM>(idx, IntVector<NDIM>(0, 1)));
+    double phi_lu = ls_data(SAMRAI::pdat::NodeIndex<NDIM>(idx, SAMRAI::hier::IntVector<NDIM>(0, 1)));
     if (std::abs(phi_lu) < s_eps) phi_lu = phi_lu < 0.0 ? -s_eps : s_eps;
     if ((phi_ll < 0.0 && phi_ul < 0.0 && phi_uu < 0.0 && phi_lu < 0.0) ||
         (phi_ll > 0.0 && phi_ul > 0.0 && phi_uu > 0.0 && phi_lu > 0.0))
@@ -133,7 +133,7 @@ find_cell_centroid(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>& ls_
 // Slow, accurate computation of cell centroid
 using Simplex = std::array<std::pair<VectorNd, double>, NDIM + 1>;
 inline IBTK::VectorNd
-find_cell_centroid_slow(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>& ls_data)
+find_cell_centroid_slow(const SAMRAI::pdat::CellIndex<NDIM>& idx, const SAMRAI::pdat::NodeData<NDIM, double>& ls_data)
 {
     IBTK::VectorNd center;
     center.setZero();
@@ -141,7 +141,7 @@ find_cell_centroid_slow(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>
     VectorNd X;
     double phi;
     int num_p = 0, num_n = 0;
-    boost::multi_array<std::pair<VectorNd, double>, NDIM> indices(boost::extents[2][2][2]);
+    boost::multi_array<std::pair<IBTK::VectorNd, double>, NDIM> indices(boost::extents[2][2][2]);
     for (int x = 0; x <= 1; ++x)
     {
         X(0) = static_cast<double>(idx(0) + x);
@@ -151,7 +151,7 @@ find_cell_centroid_slow(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>
             for (int z = 0; z <= 1; ++z)
             {
                 X(2) = static_cast<double>(idx(2) + z);
-                NodeIndex<NDIM> n_idx(idx, IntVector<NDIM>(x, y, z));
+                SAMRAI::pdat::NodeIndex<NDIM> n_idx(idx, SAMRAI::hier::IntVector<NDIM>(x, y, z));
                 phi = ls_data(n_idx);
                 if (std::abs(phi) < s_eps) phi = phi < 0.0 ? -s_eps : s_eps;
                 indices[x][y][z] = std::make_pair(X, phi);
@@ -289,9 +289,9 @@ find_cell_centroid_slow(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>
 }
 // Fast, but possibly wrong computation of cell centroid
 inline VectorNd
-find_cell_centroid(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>& ls_data)
+find_cell_centroid(const SAMRAI::pdat::CellIndex<NDIM>& idx, const SAMRAI::pdat::NodeData<NDIM, double>& ls_data)
 {
-    VectorNd centroid;
+    IBTK::VectorNd centroid;
     std::vector<VectorNd> vertices;
     // Find all vertices
     for (int normal = 0; normal < NDIM; ++normal)
@@ -300,7 +300,7 @@ find_cell_centroid(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>& ls_
         {
             for (int side2 = 0; side2 < 2; ++side2)
             {
-                IntVector<NDIM> dir(0);
+                SAMRAI::hier::IntVector<NDIM> dir(0);
                 dir(normal) = 1;
                 IntVector<NDIM> low(0, 0, 0);
                 if (normal == 0)
@@ -318,11 +318,11 @@ find_cell_centroid(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>& ls_
                     low(0) = side1;
                     low(1) = side2;
                 }
-                const NodeIndex<NDIM> ni(idx, low);
+                const SAMRAI::pdat::NodeIndex<NDIM> ni(idx, low);
                 const double& phi_l = ls_data(ni);
                 const double& phi_u = ls_data(ni + dir);
 
-                VectorNd x_l = VectorNd::Zero(), x_u = VectorNd::Zero();
+                IBTK::VectorNd x_l = IBTK::VectorNd::Zero(), x_u = IBTK::VectorNd::Zero();
                 for (int d = 0; d < NDIM; ++d)
                 {
                     x_l(d) = static_cast<double>(ni(d));
@@ -339,8 +339,8 @@ find_cell_centroid(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>& ls_
         {
             for (int z = 0; z < 2; ++z)
             {
-                IntVector<NDIM> node(x, y, z);
-                const NodeIndex<NDIM> ni(idx, node);
+                SAMRAI::hier::IntVector<NDIM> node(x, y, z);
+                const SAMRAI::pdat::NodeIndex<NDIM> ni(idx, node);
                 if (ls_data(ni) < 0.0)
                     vertices.push_back(
                         { static_cast<double>(ni(0)), static_cast<double>(ni(1)), static_cast<double>(ni(2)) });
@@ -364,13 +364,13 @@ find_cell_centroid(const CellIndex<NDIM>& idx, const NodeData<NDIM, double>& ls_
 #endif
 
 inline double
-node_to_cell(const CellIndex<NDIM>& idx, NodeData<NDIM, double>& ls_data)
+node_to_cell(const SAMRAI::pdat::CellIndex<NDIM>& idx, SAMRAI::pdat::NodeData<NDIM, double>& ls_data)
 {
 #if (NDIM == 2)
-    NodeIndex<NDIM> idx_ll(idx, IntVector<NDIM>(0, 0));
-    NodeIndex<NDIM> idx_lu(idx, IntVector<NDIM>(0, 1));
-    NodeIndex<NDIM> idx_ul(idx, IntVector<NDIM>(1, 0));
-    NodeIndex<NDIM> idx_uu(idx, IntVector<NDIM>(1, 1));
+    SAMRAI::pdat::NodeIndex<NDIM> idx_ll(idx, SAMRAI::hier::IntVector<NDIM>(0, 0));
+    SAMRAI::pdat::NodeIndex<NDIM> idx_lu(idx, SAMRAI::hier::IntVector<NDIM>(0, 1));
+    SAMRAI::pdat::NodeIndex<NDIM> idx_ul(idx, SAMRAI::hier::IntVector<NDIM>(1, 0));
+    SAMRAI::pdat::NodeIndex<NDIM> idx_uu(idx, SAMRAI::hier::IntVector<NDIM>(1, 1));
     double ls_ll = ls_data(idx_ll), ls_lu = ls_data(idx_lu);
     double ls_ul = ls_data(idx_ul), ls_uu = ls_data(idx_uu);
     return 0.25 * (ls_ll + ls_lu + ls_ul + ls_uu);
@@ -383,7 +383,7 @@ node_to_cell(const CellIndex<NDIM>& idx, NodeData<NDIM, double>& ls_data)
         {
             for (int z = 0; z < 2; ++z)
             {
-                NodeIndex<NDIM> n_idx(idx, IntVector<NDIM>(x, y, z));
+                SAMRAI::pdat::NodeIndex<NDIM> n_idx(idx, SAMRAI::hier::IntVector<NDIM>(x, y, z));
                 val += ls_data(n_idx);
             }
         }
@@ -531,22 +531,24 @@ using ReactionFcnCtx = std::pair<ReactionFcn, void*>;
 using BdryConds = std::tuple<ReactionFcn, ReactionFcn, void*>;
 
 inline void
-copy_face_to_side(const int u_s_idx, const int u_f_idx, Pointer<PatchHierarchy<NDIM>> hierarchy)
+copy_face_to_side(const int u_s_idx,
+                  const int u_f_idx,
+                  SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy)
 {
     for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
     {
-        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+        SAMRAI::tbox::Pointer<SAMRAI::hier::PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
+        for (SAMRAI::hier::PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<SideData<NDIM, double>> s_data = patch->getPatchData(u_s_idx);
-            Pointer<FaceData<NDIM, double>> f_data = patch->getPatchData(u_f_idx);
+            SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>> patch = level->getPatch(p());
+            SAMRAI::tbox::Pointer<SAMRAI::pdat::SideData<NDIM, double>> s_data = patch->getPatchData(u_s_idx);
+            SAMRAI::tbox::Pointer<SAMRAI::pdat::FaceData<NDIM, double>> f_data = patch->getPatchData(u_f_idx);
             for (int axis = 0; axis < NDIM; ++axis)
             {
-                for (SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
+                for (SAMRAI::pdat::SideIterator<NDIM> si(patch->getBox(), axis); si; si++)
                 {
-                    const SideIndex<NDIM>& s_idx = si();
-                    FaceIndex<NDIM> f_idx(s_idx.toCell(0), axis, 1);
+                    const SAMRAI::pdat::SideIndex<NDIM>& s_idx = si();
+                    SAMRAI::pdat::FaceIndex<NDIM> f_idx(s_idx.toCell(0), axis, 1);
                     (*s_data)(s_idx) = (*f_data)(f_idx);
                 }
             }
@@ -557,12 +559,14 @@ copy_face_to_side(const int u_s_idx, const int u_f_idx, Pointer<PatchHierarchy<N
 struct PatchIndexPair
 {
 public:
-    PatchIndexPair(const Pointer<Patch<NDIM>>& patch, const CellIndex<NDIM>& idx) : d_idx(idx)
+    PatchIndexPair(const SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>>& patch,
+                   const SAMRAI::pdat::CellIndex<NDIM>& idx)
+        : d_idx(idx)
     {
         d_patch_num = patch->getPatchNumber();
-        const Box<NDIM>& box = patch->getBox();
-        const hier::Index<NDIM>& idx_low = box.lower();
-        const hier::Index<NDIM>& idx_up = box.upper();
+        const SAMRAI::hier::Box<NDIM>& box = patch->getBox();
+        const SAMRAI::hier::Index<NDIM>& idx_low = box.lower();
+        const SAMRAI::hier::Index<NDIM>& idx_up = box.upper();
         int num_x = idx_up(0) - idx_low(0) + 1;
         d_global_idx = idx(0) - idx_low(0) + num_x * (idx(1) - idx_low(1) + 1);
 #if (NDIM == 3)
@@ -587,7 +591,7 @@ public:
         return less_than_b;
     }
 
-    CellIndex<NDIM> d_idx;
+    SAMRAI::pdat::CellIndex<NDIM> d_idx;
     int d_patch_num = -1;
     int d_global_idx = -1;
 };
@@ -598,7 +602,7 @@ public:
     CutCellElems(libMesh::Elem* parent_elem, std::vector<libMesh::Point> intersections)
         : d_parent_elem(parent_elem), d_intersections(intersections)
     {
-        d_elem = Elem::build(d_parent_elem->type());
+        d_elem = libMesh::Elem::build(d_parent_elem->type());
         for (size_t n = 0; n < d_intersections.size(); ++n)
         {
             d_nodes.push_back(libMesh::Node::build(d_intersections[n], n));

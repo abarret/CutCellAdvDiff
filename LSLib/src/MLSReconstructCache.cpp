@@ -1,5 +1,7 @@
 #include "LS/MLSReconstructCache.h"
 
+#include "ibamr/app_namespaces.h"
+
 namespace LS
 {
 MLSReconstructCache::MLSReconstructCache(int ls_idx,

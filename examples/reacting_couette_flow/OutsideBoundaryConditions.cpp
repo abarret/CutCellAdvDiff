@@ -1,5 +1,7 @@
 #include "OutsideBoundaryConditions.h"
 
+#include "ibamr/app_namespaces.h"
+
 OutsideBoundaryConditions::OutsideBoundaryConditions(const std::string& object_name,
                                                      Pointer<Database> input_db,
                                                      Pointer<CellVariable<NDIM, double>> in_var,

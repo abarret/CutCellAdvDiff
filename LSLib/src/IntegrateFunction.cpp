@@ -1,11 +1,11 @@
-#include "ibamr/namespaces.h"
-
 #include "LS/IntegrateFunction.h"
 #include "LS/utility_functions.h"
 
 #include "tbox/ShutdownRegistry.h"
 
 #include "boost/multi_array.hpp"
+
+#include "ibamr/namespaces.h"
 
 namespace LS
 {

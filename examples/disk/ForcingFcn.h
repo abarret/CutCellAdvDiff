@@ -16,16 +16,12 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-// IBTK INCLUDES
 #include <ibtk/CartGridFunction.h>
 #include <ibtk/ibtk_utilities.h>
 
-// SAMRAI INCLUDES
 #include <CartesianGridGeometry.h>
 
-// C++ namespace delcarations
 #include <ibamr/AdvDiffHierarchyIntegrator.h>
-#include <ibamr/app_namespaces.h>
 
 #include "LS/IntegrateFunction.h"
 #include "LS/LSCartGridFunction.h"
@@ -43,7 +39,7 @@ public:
     /*!
      * \brief Constructor.
      */
-    ForcingFcn(const string& object_name, Pointer<Database> input_db);
+    ForcingFcn(const std::string& object_name, SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
     /*!
      * \brief Destructor.
@@ -102,7 +98,7 @@ private:
     double d_k_on = 0.0;
     double d_k_off = 0.0;
     double d_sf_max = 0.0;
-    VectorNd d_cent = { 0.0, 0.0 };
+    IBTK::VectorNd d_cent = { 0.0, 0.0 };
 };
 
 } // namespace LS

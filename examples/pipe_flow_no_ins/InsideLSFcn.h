@@ -16,16 +16,11 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-// IBTK INCLUDES
 #include <ibtk/CartGridFunction.h>
 #include <ibtk/HierarchyIntegrator.h>
 #include <ibtk/ibtk_utilities.h>
 
-// SAMRAI INCLUDES
 #include <CartesianGridGeometry.h>
-
-// C++ namespace delcarations
-#include <ibamr/app_namespaces.h>
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
@@ -38,7 +33,7 @@ public:
     /*!
      * \brief Constructor.
      */
-    InsideLSFcn(const string& object_name, SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
+    InsideLSFcn(const std::string& object_name, SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
     /*!
      * \brief Destructor.
@@ -97,7 +92,7 @@ private:
      * The object name is used as a handle to databases stored in restart files
      * and for error reporting purposes.
      */
-    string d_object_name;
+    std::string d_object_name;
 
     double d_theta = 0.0;
     double d_L = 0.0;

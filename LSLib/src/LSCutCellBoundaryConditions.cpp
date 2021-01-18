@@ -1,5 +1,7 @@
 #include "LS/LSCutCellBoundaryConditions.h"
 
+#include "ibamr/app_namespaces.h"
+
 namespace LS
 {
 LSCutCellBoundaryConditions::LSCutCellBoundaryConditions(const std::string& object_name) : d_object_name(object_name)

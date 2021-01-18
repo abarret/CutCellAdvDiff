@@ -19,6 +19,8 @@
 
 #include <array>
 
+#include "ibamr/app_namespaces.h"
+
 namespace LS
 {
 /////////////////////////////// PUBLIC ///////////////////////////////////////

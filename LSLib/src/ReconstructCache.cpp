@@ -1,5 +1,7 @@
 #include "LS/ReconstructCache.h"
 
+#include "ibamr/app_namespaces.h"
+
 namespace LS
 {
 ReconstructCache::ReconstructCache(int ls_idx, int vol_idx, Pointer<PatchHierarchy<NDIM>> hierarchy, bool use_centroids)

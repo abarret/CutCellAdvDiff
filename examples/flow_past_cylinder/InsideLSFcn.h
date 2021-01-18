@@ -16,7 +16,6 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-// IBTK INCLUDES
 #include <ibamr/FESurfaceDistanceEvaluator.h>
 
 #include <ibtk/CartGridFunction.h>
@@ -25,7 +24,6 @@
 
 #include <libmesh/boundary_mesh.h>
 
-// SAMRAI INCLUDES
 #include <CartesianGridGeometry.h>
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////

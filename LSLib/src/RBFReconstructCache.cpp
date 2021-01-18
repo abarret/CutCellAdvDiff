@@ -1,5 +1,7 @@
 #include "LS/RBFReconstructCache.h"
 
+#include "ibamr/app_namespaces.h"
+
 namespace LS
 {
 RBFReconstructCache::RBFReconstructCache(int ls_idx,

@@ -8,7 +8,6 @@
 #include "ibtk/HierarchyMathOps.h"
 #include "ibtk/LaplaceOperator.h"
 #include "ibtk/ibtk_utilities.h"
-#include "ibtk/namespaces.h" // IWYU pragma: keep
 
 #include "LS/LSCutCellLaplaceOperator.h"
 #include "LS/utility_functions.h"
@@ -27,6 +26,8 @@
 #include <ostream>
 #include <string>
 #include <vector>
+
+#include "ibtk/namespaces.h" // IWYU pragma: keep
 
 /////////////////////////////// NAMESPACE ////////////////////////////////////
 

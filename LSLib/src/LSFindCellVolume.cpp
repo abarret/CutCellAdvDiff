@@ -3,6 +3,8 @@
 #include "LS/LSFindCellVolume.h"
 #include "LS/utility_functions.h"
 
+#include "ibamr/app_namespaces.h"
+
 namespace LS
 {
 LSFindCellVolume::LSFindCellVolume(std::string object_name, Pointer<PatchHierarchy<NDIM>> hierarchy)

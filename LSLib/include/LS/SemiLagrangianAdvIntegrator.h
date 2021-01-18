@@ -1,9 +1,10 @@
 #ifndef included_LS_SemiLagrangianAdvIntegrator
 #define included_LS_SemiLagrangianAdvIntegrator
 
+#include "ibamr/config.h"
+
 #include "ibamr/AdvDiffHierarchyIntegrator.h"
 #include "ibamr/LSInitStrategy.h"
-#include "ibamr/config.h"
 
 #include "ibtk/PETScKrylovPoissonSolver.h"
 #include "ibtk/PoissonSolver.h"
@@ -42,7 +43,7 @@ public:
                                      SAMRAI::tbox::Pointer<LSFindCellVolume> vol_fcn);
 
     void registerLevelSetResetFunction(SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> ls_var,
-                                       SAMRAI::tbox::Pointer<LSInitStrategy> ls_strategy);
+                                       SAMRAI::tbox::Pointer<IBAMR::LSInitStrategy> ls_strategy);
 
     void setFEDataManagerNeedsInitialization(IBTK::FEDataManager* fe_data_manager);
 
@@ -129,9 +130,10 @@ protected:
     void initializeCompositeHierarchyDataSpecialized(double current_time, bool initial_time) override;
     void regridHierarchyBeginSpecialized() override;
     void resetTimeDependentHierarchyDataSpecialized(double new_time) override;
-    void resetHierarchyConfigurationSpecialized(Pointer<BasePatchHierarchy<NDIM>> base_hierarchy,
-                                                int coarsest_ln,
-                                                int finest_ln);
+    void
+    resetHierarchyConfigurationSpecialized(SAMRAI::tbox::Pointer<SAMRAI::hier::BasePatchHierarchy<NDIM>> base_hierarchy,
+                                           int coarsest_ln,
+                                           int finest_ln);
 
     void addWorkloadEstimate(SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
                              const int workload_data_idx) override;
@@ -182,7 +184,8 @@ protected:
     std::map<SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>>,
              SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>>>
         d_ls_ls_cell_map;
-    std::map<SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>>, SAMRAI::tbox::Pointer<LSInitStrategy>>
+    std::map<SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>>,
+             SAMRAI::tbox::Pointer<IBAMR::LSInitStrategy>>
         d_ls_strategy_map;
     std::map<SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>>,
              std::shared_ptr<SBSurfaceFluidCouplingManager>>
@@ -232,22 +235,22 @@ private:
                            const int order);
 
     bool indexWithinWidth(int stencil_width,
-                          const CellIndex<NDIM>& idx,
+                          const SAMRAI::pdat::CellIndex<NDIM>& idx,
                           const SAMRAI::pdat::CellData<NDIM, double>& vol_data);
 
     double radialBasisFunctionReconstruction(IBTK::VectorNd x_loc,
-                                             const CellIndex<NDIM>& idx,
-                                             const CellData<NDIM, double>& Q_data,
-                                             const CellData<NDIM, double>& vol_data,
-                                             const NodeData<NDIM, double>& ls_data,
-                                             const Pointer<Patch<NDIM>>& patch);
+                                             const SAMRAI::pdat::CellIndex<NDIM>& idx,
+                                             const SAMRAI::pdat::CellData<NDIM, double>& Q_data,
+                                             const SAMRAI::pdat::CellData<NDIM, double>& vol_data,
+                                             const SAMRAI::pdat::NodeData<NDIM, double>& ls_data,
+                                             const SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>>& patch);
 
     double leastSquaresReconstruction(IBTK::VectorNd x_loc,
-                                      const CellIndex<NDIM>& idx,
-                                      const CellData<NDIM, double>& Q_data,
-                                      const CellData<NDIM, double>& vol_data,
-                                      const NodeData<NDIM, double>& ls_data,
-                                      const Pointer<Patch<NDIM>>& patch);
+                                      const SAMRAI::pdat::CellIndex<NDIM>& idx,
+                                      const SAMRAI::pdat::CellData<NDIM, double>& Q_data,
+                                      const SAMRAI::pdat::CellData<NDIM, double>& vol_data,
+                                      const SAMRAI::pdat::NodeData<NDIM, double>& ls_data,
+                                      const SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>>& patch);
 
     double evaluateZSpline(const IBTK::VectorNd x, const int order);
 

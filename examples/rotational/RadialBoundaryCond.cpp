@@ -1,5 +1,7 @@
 #include "RadialBoundaryCond.h"
 
+#include "ibamr/app_namespaces.h"
+
 RadialBoundaryCond::RadialBoundaryCond(const std::string& object_name, Pointer<Database> input_db)
     : LSCutCellBoundaryConditions(object_name)
 {

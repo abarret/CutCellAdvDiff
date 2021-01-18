@@ -21,6 +21,8 @@
 
 #include <array>
 
+#include "ibamr/app_namespaces.h"
+
 double InsideLSFcn::s_large_num = 0.5;
 
 namespace

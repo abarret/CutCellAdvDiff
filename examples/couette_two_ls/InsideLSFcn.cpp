@@ -11,16 +11,17 @@
 //
 // ---------------------------------------------------------------------
 
+#include <ibamr/config.h>
+
 #include "LS/utility_functions.h"
 
 #include "InsideLSFcn.h"
-/////////////////////////////// INCLUDES /////////////////////////////////////
-
-#include <ibamr/config.h>
 
 #include <SAMRAI_config.h>
 
 #include <array>
+
+#include "ibamr/app_namespaces.h"
 
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 

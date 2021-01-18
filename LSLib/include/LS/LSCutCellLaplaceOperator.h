@@ -112,13 +112,13 @@ public:
     void deallocateOperatorState() override;
 
     void setLSIndices(int ls_idx,
-                      Pointer<NodeVariable<NDIM, double>> ls_var,
+                      SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> ls_var,
                       int vol_idx,
-                      Pointer<CellVariable<NDIM, double>> vol_var,
+                      SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> vol_var,
                       int area_idx,
-                      Pointer<CellVariable<NDIM, double>> area_var,
+                      SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> area_var,
                       int side_idx,
-                      Pointer<SideVariable<NDIM, double>> side_var);
+                      SAMRAI::tbox::Pointer<SAMRAI::pdat::SideVariable<NDIM, double>> side_var);
 
     inline void setBoundaryConditionOperator(SAMRAI::tbox::Pointer<LSCutCellBoundaryConditions> bdry_conds)
     {
@@ -168,16 +168,16 @@ private:
     /*!
      * \brief Computes action of Helmholtz operator.
      */
-    void computeHelmholtzAction(const CellData<NDIM, double>& Q_data,
-                                CellData<NDIM, double>& R_data,
-                                const Patch<NDIM>& patch);
+    void computeHelmholtzAction(const SAMRAI::pdat::CellData<NDIM, double>& Q_data,
+                                SAMRAI::pdat::CellData<NDIM, double>& R_data,
+                                const SAMRAI::hier::Patch<NDIM>& patch);
 
     // Operator parameters.
     int d_ncomp = 0;
 
     // Cached communications operators.
-    std::vector<HierarchyGhostCellInterpolation::InterpolationTransactionComponent> d_transaction_comps;
-    SAMRAI::tbox::Pointer<HierarchyGhostCellInterpolation> d_hier_bdry_fill;
+    std::vector<IBTK::HierarchyGhostCellInterpolation::InterpolationTransactionComponent> d_transaction_comps;
+    SAMRAI::tbox::Pointer<IBTK::HierarchyGhostCellInterpolation> d_hier_bdry_fill;
 
     // Scratch data.
     SAMRAI::tbox::Pointer<SAMRAI::solv::SAMRAIVectorReal<NDIM, double>> d_x, d_b;

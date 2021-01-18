@@ -2,6 +2,8 @@
 
 #include "RadialBoundaryCond.h"
 
+#include "ibamr/app_namespaces.h"
+
 namespace
 {
 static Timer* s_apply_timer = nullptr;

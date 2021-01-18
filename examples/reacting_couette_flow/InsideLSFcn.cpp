@@ -22,6 +22,8 @@
 
 #include <array>
 
+#include "ibamr/app_namespaces.h"
+
 /////////////////////////////// PUBLIC ///////////////////////////////////////
 
 InsideLSFcn::InsideLSFcn(const string& object_name, Pointer<Database> input_db)

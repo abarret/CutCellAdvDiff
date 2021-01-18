@@ -16,16 +16,11 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-// IBTK INCLUDES
 #include <ibtk/CartGridFunction.h>
 #include <ibtk/HierarchyIntegrator.h>
 #include <ibtk/ibtk_utilities.h>
 
-// SAMRAI INCLUDES
 #include <CartesianGridGeometry.h>
-
-// C++ namespace delcarations
-#include <ibamr/app_namespaces.h>
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
@@ -38,13 +33,13 @@ public:
     /*!
      * \brief Constructor.
      */
-    OutsideLSFcn(const string& object_name,
+    OutsideLSFcn(const std::string& object_name,
                  SAMRAI::tbox::Pointer<IBTK::HierarchyIntegrator> hierarchy_integrator,
                  SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> in_var,
                  SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
     OutsideLSFcn(SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> ctx,
-                 const string& object_name,
+                 const std::string& object_name,
                  SAMRAI::tbox::Pointer<SAMRAI::pdat::NodeVariable<NDIM, double>> in_var,
                  SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
 
