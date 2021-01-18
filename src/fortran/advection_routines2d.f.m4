@@ -1,4 +1,10 @@
 c234567
+
+define(NDIM,2)dnl
+define(REAL,`double precision')dnl
+define(INTEGER,`integer')dnl
+include(SAMRAI_FORTDIR/pdat_m4arrdim2d.i)dnl
+
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     Integrate paths that do not involve level set functions using an c
 c     explicit backward in time midpoint method.                       c
@@ -8,32 +14,26 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &         ilower0, ilower1, iupper0, iupper1)
         implicit none
 
-        integer ilower0, ilower1
-        integer iupper0, iupper1
+        INTEGER ilower0, ilower1
+        INTEGER iupper0, iupper1
 
-        integer path_gcw
-        double precision path((ilower0-path_gcw):(iupper0+path_gcw),
-     &                        (ilower1-path_gcw):(iupper1+path_gcw),
-     &                        0:1)
+        INTEGER path_gcw
+        REAL path(CELL2d(ilower,iupper,path_gcw),0:1)
 
-        integer un_gcw
-        double precision un_0((ilower0-un_gcw):(iupper0+un_gcw+1),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw))
-        double precision un_1((ilower0-un_gcw):(iupper0+un_gcw),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw+1))
+        INTEGER un_gcw
+        REAL un_0(SIDE2d0(ilower,iupper,un_gcw))
+        REAL un_1(SIDE2d1(ilower,iupper,un_gcw))
 
-        integer uh_gcw
-        double precision uh_0((ilower0-uh_gcw):(iupper0+uh_gcw+1),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw))
-        double precision uh_1((ilower0-uh_gcw):(iupper0+uh_gcw),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw+1))
+        INTEGER uh_gcw
+        REAL uh_0(SIDE2d0(ilower,iupper,uh_gcw))
+        REAL uh_1(SIDE2d1(ilower,iupper,uh_gcw))
 
-        double precision dt, dx(0:1)
+        REAL dt, dx(0:1)
 
-        integer i0, i1
-        double precision ux, uy
-        double precision xcom, ycom
-        double precision xcom_o, ycom_o
+        INTEGER i0, i1
+        REAL ux, uy
+        REAL xcom, ycom
+        REAL xcom_o, ycom_o
 
         do i0 = ilower0,iupper0
           do i1 = ilower1,iupper1
@@ -61,24 +61,20 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &   u_gcw, dt, dx, ilower0, ilower1, iupper0, iupper1)
         implicit none
 
-        integer ilower0, ilower1
-        integer iupper0, iupper1
+        INTEGER ilower0, ilower1
+        INTEGER iupper0, iupper1
 
-        integer path_gcw
-        double precision path((ilower0-path_gcw):(iupper0+path_gcw),
-     &                        (ilower1-path_gcw):(iupper1+path_gcw),
-     &                        0:1)
+        INTEGER path_gcw
+        REAL path(CELL2d(ilower,iupper,path_gcw),0:1)
 
-        integer u_gcw
-        double precision u_0((ilower0-u_gcw):(iupper0+u_gcw+1),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw))
-        double precision u_1((ilower0-u_gcw):(iupper0+u_gcw),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw+1))
+        INTEGER u_gcw
+        REAL u_0(SIDE2d0(ilower,iupper,u_gcw))
+        REAL u_1(SIDE2d1(ilower,iupper,u_gcw))
 
-        double precision dt, dx(0:1)
-        integer i0, i1
-        double precision ux, uy
-        double precision xcom, ycom
+        REAL dt, dx(0:1)
+        INTEGER i0, i1
+        REAL ux, uy
+        REAL xcom, ycom
 
         do i0 = ilower0,iupper0
           do i1 = ilower1,iupper1
@@ -101,35 +97,28 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &         ilower0, ilower1, iupper0, iupper1)
         implicit none
        
-        integer ilower0, ilower1
-        integer iupper0, iupper1
+        INTEGER ilower0, ilower1
+        INTEGER iupper0, iupper1
          
-        integer path_gcw
-        double precision path((ilower0-path_gcw):(iupper0+path_gcw),
-     &                        (ilower1-path_gcw):(iupper1+path_gcw),
-     &                        0:1)
+        INTEGER path_gcw
+        REAL path(CELL2d(ilower,iupper,path_gcw),0:1)
      
-        integer un_gcw
-        double precision un_0((ilower0-un_gcw):(iupper0+un_gcw+1),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw))
-        double precision un_1((ilower0-un_gcw):(iupper0+un_gcw),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw+1))
+        INTEGER un_gcw
+        REAL un_0(SIDE2d0(ilower,iupper,un_gcw))
+        REAL un_1(SIDE2d1(ilower,iupper,un_gcw))
      
-        integer uh_gcw
-        double precision uh_0((ilower0-uh_gcw):(iupper0+uh_gcw+1),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw))
-        double precision uh_1((ilower0-uh_gcw):(iupper0+uh_gcw),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw+1))
+        INTEGER uh_gcw
+        REAL uh_0(SIDE2d0(ilower,iupper,uh_gcw))
+        REAL uh_1(SIDE2d1(ilower,iupper,uh_gcw))
      
-        integer ls_gcw
-        double precision ls((ilower0-ls_gcw):(iupper0+ls_gcw+1),
-     &                      (ilower1-ls_gcw):(iupper1+ls_gcw+1))
+        INTEGER ls_gcw
+        REAL ls(NODE2d(ilower,iupper,ls_gcw))
 
-        double precision dt, dx(0:1)
-        integer i0, i1
-        double precision ux, uy
-        double precision xcom, ycom
-        double precision xcom_o, ycom_o
+        REAL dt, dx(0:1)
+        INTEGER i0, i1
+        REAL ux, uy
+        REAL xcom, ycom
+        REAL xcom_o, ycom_o
          
         do i0 = ilower0,iupper0
           do i1 = ilower1,iupper1
@@ -157,26 +146,23 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &   u_gcw, ls, ls_gcw, dt, dx, ilower0, ilower1, iupper0, iupper1)
         implicit none
 
-        integer ilower0, ilower1
-        integer iupper0, iupper1
+        INTEGER ilower0, ilower1
+        INTEGER iupper0, iupper1
          
-        integer path_gcw
-        double precision path((ilower0-path_gcw):(iupper0+path_gcw),
-     &                        (ilower1-path_gcw):(iupper1+path_gcw),
-     &                        0:1)
-        integer u_gcw
-        double precision u_0((ilower0-u_gcw):(iupper0+u_gcw+1),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw))
-        double precision u_1((ilower0-u_gcw):(iupper0+u_gcw),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw+1))
-        integer ls_gcw
-        double precision ls((ilower0-ls_gcw):(iupper0+ls_gcw+1),
-     &                      (ilower1-ls_gcw):(iupper1+ls_gcw+1))
+        INTEGER path_gcw
+        REAL path(CELL2d(ilower,iupper,path_gcw),0:1)
+        
+        INTEGER u_gcw
+        REAL u_0(SIDE2d0(ilower,iupper,u_gcw))
+        REAL u_1(SIDE2d1(ilower,iupper,u_gcw))
 
-        double precision dt, dx(0:1)
-        integer i0, i1
-        double precision ux, uy
-        double precision xcom, ycom
+        INTEGER ls_gcw
+        REAL ls(NODE2d(ilower,iupper,ls_gcw))
+
+        REAL dt, dx(0:1)
+        INTEGER i0, i1
+        REAL ux, uy
+        REAL xcom, ycom
 
         do i0 = ilower0,iupper0
           do i1 = ilower1,iupper1
@@ -198,23 +184,21 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &      ilower0, ilower1, iupper0, iupper1,
      &      x0, x1, u0_ret, u1_ret)
         implicit none
-        integer i0, i1
-        integer ilower0, ilower1
-        integer iupper0, iupper1
+        INTEGER i0, i1
+        INTEGER ilower0, ilower1
+        INTEGER iupper0, iupper1
 
-        integer u_gcw
-        double precision u0((ilower0-u_gcw):(iupper0+u_gcw+1),
-     &                      (ilower1-u_gcw):(iupper1+u_gcw))
-        double precision u1((ilower0-u_gcw):(iupper0+u_gcw),
-     &                      (ilower1-u_gcw):(iupper1+u_gcw+1))
+        INTEGER u_gcw
+        REAL u0(SIDE2d0(ilower,iupper,u_gcw))
+        REAL u1(SIDE2d1(ilower,iupper,u_gcw))
 
-        double precision x0, x1
+        REAL x0, x1
 
-        double precision u0_ret, u1_ret
+        REAL u0_ret, u1_ret
 
-        double precision xlow, ylow
-        integer i_ll, i_ul, i_lu, i_uu
-        integer j_ll, j_ul, j_lu, j_uu
+        REAL xlow, ylow
+        INTEGER i_ll, i_ul, i_lu, i_uu
+        INTEGER j_ll, j_ul, j_lu, j_uu
      
         if(x1 .gt. (DBLE(i1) + 0.5d0)) then
           i_ll = i0
@@ -287,12 +271,12 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       subroutine find_cell_centroid(xcom, ycom, i0, i1,
      &        ls_ll, ls_lu, ls_uu, ls_ul)
         implicit none
-        double precision xcom, ycom
-        double precision ls_ll, ls_lu, ls_ul, ls_uu
-        integer i0, i1
-        double precision x_bounds(0:7), y_bounds(0:7)
-        integer num, i, i2
-        double precision sgn_area, fac
+        REAL xcom, ycom
+        REAL ls_ll, ls_lu, ls_ul, ls_uu
+        INTEGER i0, i1
+        REAL x_bounds(0:7), y_bounds(0:7)
+        INTEGER num, i, i2
+        REAL sgn_area, fac
 
         if (DABS(ls_ll) .lt. 1.0d-12) then
           ls_ll = DSIGN(1.0d-12, ls_ll)

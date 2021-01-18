@@ -1,4 +1,9 @@
 c234567
+
+define(NDIM,3)dnl
+define(REAL,`double precision')dnl
+define(INTEGER,`integer')dnl
+include(SAMRAI_FORTDIR/pdat_m4arrdim3d.i)dnl
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     Integrate paths that do not involve level set functions using an c
 c     explicit backward in time midpoint method.                       c
@@ -8,43 +13,28 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &         ilower0, ilower1, ilower2, iupper0, iupper1, iupper2)
         implicit none
 
-        integer ilower0, ilower1, ilower2
-        integer iupper0, iupper1, iupper2
+        INTEGER ilower0, ilower1, ilower2
+        INTEGER iupper0, iupper1, iupper2
 
-        integer path_gcw
-        double precision path((ilower0-path_gcw):(iupper0+path_gcw),
-     &                        (ilower1-path_gcw):(iupper1+path_gcw),
-     &                        (ilower2-path_gcw):(iupper2+path_gcw),
-     &                        0:2)
+        INTEGER path_gcw
+        REAL path(CELL3d(ilower,iupper,path_gcw),0:2)
 
-        integer un_gcw
-        double precision un_0((ilower0-un_gcw):(iupper0+un_gcw+1),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw),
-     &                        (ilower2-un_gcw):(iupper2+un_gcw))
-        double precision un_1((ilower0-un_gcw):(iupper0+un_gcw),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw+1),
-     &                        (ilower2-un_gcw):(iupper2+un_gcw))
-        double precision un_2((ilower0-un_gcw):(iupper0+un_gcw),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw),
-     &                        (ilower2-un_gcw):(iupper2+un_gcw+1))
+        INTEGER un_gcw
+        REAL path(SIDE3d0(ilower,iupper,un_gcw))
+        REAL path(SIDE3d1(ilower,iupper,un_gcw))
+        REAL path(SIDE3d2(ilower,iupper,un_gcw))
 
-        integer uh_gcw
-        double precision uh_0((ilower0-uh_gcw):(iupper0+uh_gcw+1),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw),
-     &                        (ilower2-uh_gcw):(iupper2+uh_gcw))
-        double precision uh_1((ilower0-uh_gcw):(iupper0+uh_gcw),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw+1),
-     &                        (ilower2-uh_gcw):(iupper2+uh_gcw))
-        double precision uh_2((ilower0-uh_gcw):(iupper0+uh_gcw),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw),
-     &                        (ilower2-uh_gcw):(iupper2+uh_gcw+1))
+        INTEGER uh_gcw
+        REAL uh_0(SIDE3d0(ilower,iupper,uh_gcw))
+        REAL uh_1(SIDE3d1(ilower,iupper,uh_gcw))
+        REAL uh_2(SIDE3d2(ilower,iupper,uh_gcw))
 
-        double precision dt, dx(0:2)
+        REAL dt, dx(0:2)
 
-        integer i0, i1, i2
-        double precision ux, uy, uz
-        double precision xcom, ycom, zcom
-        double precision xcom_o, ycom_o, zcom_o
+        INTEGER i0, i1, i2
+        REAL ux, uy, uz
+        REAL xcom, ycom, zcom
+        REAL xcom_o, ycom_o, zcom_o
 
         do i0 = ilower0,iupper0
           do i1 = ilower1,iupper1
@@ -79,30 +69,21 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &   iupper0, iupper1, iupper2)
         implicit none
 
-        integer ilower0, ilower1, ilower2
-        integer iupper0, iupper1, iupper2
+        INTEGER ilower0, ilower1, ilower2
+        INTEGER iupper0, iupper1, iupper2
 
-        integer path_gcw
-        double precision path((ilower0-path_gcw):(iupper0+path_gcw),
-     &                        (ilower1-path_gcw):(iupper1+path_gcw),
-     &                        (ilower2-path_gcw):(iupper2+path_gcw),
-     &                        0:2)
+        INTEGER path_gcw
+        REAL path(CELL3d(ilower,iupper,path_gcw),0:2)
 
-        integer u_gcw
-        double precision u_0((ilower0-u_gcw):(iupper0+u_gcw+1),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw),
-     &                       (ilower2-u_gcw):(iupper2+u_gcw))
-        double precision u_1((ilower0-u_gcw):(iupper0+u_gcw),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw+1),
-     &                       (ilower2-u_gcw):(iupper2+u_gcw))
-        double precision u_2((ilower0-u_gcw):(iupper0+u_gcw),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw),
-     &                       (ilower2-u_gcw):(iupper2+u_gcw+1))
+        INTEGER u_gcw
+        REAL u_0(SIDE3d0(ilower,iupper,u_gcw))
+        REAL u_1(SIDE3d1(ilower,iupper,u_gcw))
+        REAL u_2(SIDE3d2(ilower,iupper,u_gcw))
 
-        double precision dt, dx(0:2)
-        integer i0, i1, i2
-        double precision ux, uy, uz
-        double precision xcom, ycom, zcom
+        REAL dt, dx(0:2)
+        INTEGER i0, i1, i2
+        REAL ux, uy, uz
+        REAL xcom, ycom, zcom
 
         do i0 = ilower0,iupper0
           do i1 = ilower1,iupper1
@@ -131,48 +112,30 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &         iupper2)
         implicit none
        
-        integer ilower0, ilower1, ilower2
-        integer iupper0, iupper1, iupper2
+        INTEGER ilower0, ilower1, ilower2
+        INTEGER iupper0, iupper1, iupper2
          
-        integer path_gcw
-        double precision path((ilower0-path_gcw):(iupper0+path_gcw),
-     &                        (ilower1-path_gcw):(iupper1+path_gcw),
-     &                        (ilower2-path_gcw):(iupper2+path_gcw),
-     &                        0:2)
+        INTEGER path_gcw
+        REAL path(CELL3d(ilower,iupper,path_gcw),0:2)
      
-        integer un_gcw
-        double precision un_0((ilower0-un_gcw):(iupper0+un_gcw+1),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw),
-     &                        (ilower2-un_gcw):(iupper2+un_gcw))
-        double precision un_1((ilower0-un_gcw):(iupper0+un_gcw),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw+1),
-     &                        (ilower2-un_gcw):(iupper2+un_gcw))
-        double precision un_2((ilower0-un_gcw):(iupper0+un_gcw),
-     &                        (ilower1-un_gcw):(iupper1+un_gcw),
-     &                        (ilower2-un_gcw):(iupper2+un_gcw+1))
+        INTEGER un_gcw
+        REAL un_0(SIDE3d0(ilower,iupper,un_gcw))
+        REAL un_1(SIDE3d1(ilower,iupper,un_gcw))
+        REAL un_2(SIDE3d2(ilower,iupper,un_gcw))
      
-        integer uh_gcw
-        double precision uh_0((ilower0-uh_gcw):(iupper0+uh_gcw+1),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw),
-     &                        (ilower2-uh_gcw):(iupper2+uh_gcw))
-        double precision uh_1((ilower0-uh_gcw):(iupper0+uh_gcw),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw+1),
-     &                        (ilower2-uh_gcw):(iupper2+uh_gcw))
-        double precision uh_2((ilower0-uh_gcw):(iupper0+uh_gcw),
-     &                        (ilower1-uh_gcw):(iupper1+uh_gcw),
-     &                        (ilower2-uh_gcw):(iupper2+uh_gcw+1))
+        INTEGER uh_gcw
+        REAL uh_0(SIDE3d0(ilower,iupper,uh_gcw))
+        REAL uh_1(SIDE3d1(ilower,iupper,uh_gcw))
+        REAL uh_2(SIDE3d2(ilower,iupper,uh_gcw))
 
-        integer c_gcw
-        double precision c_data((ilower0-c_gcw):(iupper0+c_gcw),
-     &                          (ilower1-c_gcw):(iupper1+c_gcw),
-     &                          (ilower2-c_gcw):(iupper2+c_gcw),
-     &                          0:2)
+        INTEGER c_gcw
+        REAL c_data(CELL3d(ilower,iupper,c_gcw),0:2)
 
-        double precision dt, dx(0:2)
-        integer i0, i1, i2
-        double precision ux, uy, uz
-        double precision xcom, ycom, zcom
-        double precision xcom_o, ycom_o, zcom_o
+        REAL dt, dx(0:2)
+        INTEGER i0, i1, i2
+        REAL ux, uy, uz
+        REAL xcom, ycom, zcom
+        REAL xcom_o, ycom_o, zcom_o
          
         do i0 = ilower0,iupper0
           do i1 = ilower1,iupper1
@@ -207,35 +170,24 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &   ilower0, ilower1, ilower2, iupper0, iupper1, iupper2)
         implicit none
 
-        integer ilower0, ilower1, ilower2
-        integer iupper0, iupper1, iupper2
+        INTEGER ilower0, ilower1, ilower2
+        INTEGER iupper0, iupper1, iupper2
          
-        integer path_gcw
-        double precision path((ilower0-path_gcw):(iupper0+path_gcw),
-     &                        (ilower1-path_gcw):(iupper1+path_gcw),
-     &                        (ilower2-path_gcw):(iupper2+path_gcw),
-     &                        0:2)
-        integer u_gcw
-        double precision u_0((ilower0-u_gcw):(iupper0+u_gcw+1),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw),
-     &                       (ilower2-u_gcw):(iupper2+u_gcw))
-        double precision u_1((ilower0-u_gcw):(iupper0+u_gcw),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw+1),
-     &                       (ilower2-u_gcw):(iupper2+u_gcw))
-        double precision u_2((ilower0-u_gcw):(iupper0+u_gcw),
-     &                       (ilower1-u_gcw):(iupper1+u_gcw),
-     &                       (ilower2-u_gcw):(iupper2+u_gcw+1))
+        INTEGER path_gcw
+        REAL path(CELL3d(ilower,iupper,path_gcw),0:2)
+        
+        INTEGER u_gcw
+        REAL u_0(SIDE3d0(ilower,iupper,u_gcw))
+        REAL u_1(SIDE3d1(ilower,iupper,u_gcw))
+        REAL u_2(SIDE3d2(ilower,iupper,u_gcw))
 
-        integer c_gcw
-        double precision c_data((ilower0-c_gcw):(iupper0+c_gcw),
-     &                          (ilower1-c_gcw):(iupper1+c_gcw),
-     &                          (ilower2-c_gcw):(iupper2+c_gcw),
-     &                          0:2)
+        INTEGER c_gcw
+        REAL c_data(CELL3d(ilower,iupper,c_gcw),0:2)
 
-        double precision dt, dx(0:2)
-        integer i0, i1, i2
-        double precision ux, uy, uz
-        double precision xcom(0:2)
+        REAL dt, dx(0:2)
+        INTEGER i0, i1, i2
+        REAL ux, uy, uz
+        REAL xcom(0:2)
 
         do i0 = ilower0,iupper0
           do i1 = ilower1,iupper1
@@ -262,30 +214,24 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      &      ilower0, ilower1, ilower2, iupper0, iupper1, iupper2,
      &      x0, x1, x2, u0_ret, u1_ret, u2_ret)
         implicit none
-        integer i0, i1, i2
-        integer ilower0, ilower1, ilower2
-        integer iupper0, iupper1, iupper2
+        INTEGER i0, i1, i2
+        INTEGER ilower0, ilower1, ilower2
+        INTEGER iupper0, iupper1, iupper2
 
-        integer u_gcw
-        double precision u0((ilower0-u_gcw):(iupper0+u_gcw+1),
-     &                      (ilower1-u_gcw):(iupper1+u_gcw),
-     &                      (ilower2-u_gcw):(iupper2+u_gcw))
-        double precision u1((ilower0-u_gcw):(iupper0+u_gcw),
-     &                      (ilower1-u_gcw):(iupper1+u_gcw+1),
-     &                      (ilower2-u_gcw):(iupper2+u_gcw))
-        double precision u2((ilower0-u_gcw):(iupper0+u_gcw),
-     &                      (ilower1-u_gcw):(iupper1+u_gcw),
-     &                      (ilower2-u_gcw):(iupper2+u_gcw+1))
+        INTEGER u_gcw
+        REAL u0(SIDE3d0(ilower,iupper,u_gcw))
+        REAL u1(SIDE3d1(ilower,iupper,u_gcw))
+        REAL u2(SIDE3d2(ilower,iupper,u_gcw))
 
-        double precision x0, x1, x2
+        REAL x0, x1, x2
 
-        double precision u0_ret, u1_ret, u2_ret
+        REAL u0_ret, u1_ret, u2_ret
 
-        double precision xlow, ylow, zlow
-        double precision coefs(1:8)
-        integer i
-        integer j
-        integer k
+        REAL xlow, ylow, zlow
+        REAL coefs(1:8)
+        INTEGER i
+        INTEGER j
+        INTEGER k
      
 c       X coordinate
         if(x1 .gt. (DBLE(i1) + 0.5d0)) then

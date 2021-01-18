@@ -16,15 +16,15 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
+#include <ibamr/AdvDiffHierarchyIntegrator.h>
+
 #include <ibtk/CartGridFunction.h>
 #include <ibtk/ibtk_utilities.h>
 
-#include <CartesianGridGeometry.h>
-
-#include <ibamr/AdvDiffHierarchyIntegrator.h>
-
 #include "LS/IntegrateFunction.h"
 #include "LS/LSCartGridFunction.h"
+
+#include <CartesianGridGeometry.h>
 
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
