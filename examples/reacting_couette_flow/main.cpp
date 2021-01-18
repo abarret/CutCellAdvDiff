@@ -303,11 +303,14 @@ main(int argc, char* argv[])
             "PoissonSolver", app_initializer->getComponentDatabase("PoissonSolver"), "poisson_solve_");
         Q_in_helmholtz_solver->setOperator(sol_in_oper);
         time_integrator->setHelmholtzSolver(Q_in_var, Q_in_helmholtz_solver);
-        Pointer<InsideBoundaryConditions> in_bdry_oper = new InsideBoundaryConditions(
-            "InsideBdryOper", app_initializer->getComponentDatabase("BdryConds"), Q_out_var, time_integrator);
-        in_bdry_oper->setContext(time_integrator->getPredictorContext());
-        rhs_in_oper->setBoundaryConditionOperator(in_bdry_oper);
-        sol_in_oper->setBoundaryConditionOperator(in_bdry_oper);
+        Pointer<InsideBoundaryConditions> in_bdry_oper_rhs = new InsideBoundaryConditions(
+            "InsideBdryOperRhs", app_initializer->getComponentDatabase("BdryConds"), Q_out_var, time_integrator);
+        Pointer<InsideBoundaryConditions> ib_bdry_oper_sol = new InsideBoundaryConditions(
+            "InsideBdryOperSol", app_initializer->getComponentDatabase("BdryConds"), Q_out_var, time_integrator);
+        in_bdry_oper_rhs->setContext(time_integrator->getCurrentContext());
+        in_bdry_oper_sol->setContext(time_integrator->getPredictorContext());
+        rhs_in_oper->setBoundaryConditionOperator(in_bdry_oper_rhs);
+        sol_in_oper->setBoundaryConditionOperator(in_bdry_oper_sol);
 
         Pointer<LSCutCellLaplaceOperator> rhs_out_oper = new LSCutCellLaplaceOperator(
             "LSCutCellRHSOutOperator", app_initializer->getComponentDatabase("LSCutCellOperator"), false);
@@ -318,11 +321,14 @@ main(int argc, char* argv[])
             "PoissonSolver", app_initializer->getComponentDatabase("PoissonSolver"), "poisson_solve_");
         Q_out_helmholtz_solver->setOperator(sol_out_oper);
         time_integrator->setHelmholtzSolver(Q_out_var, Q_out_helmholtz_solver);
-        Pointer<OutsideBoundaryConditions> out_bdry_oper = new OutsideBoundaryConditions(
-            "OutsideBdryOper", app_initializer->getComponentDatabase("BdryConds"), Q_in_var, time_integrator);
-        out_bdry_oper->setContext(time_integrator->getPredictorContext());
-        rhs_out_oper->setBoundaryConditionOperator(out_bdry_oper);
-        sol_out_oper->setBoundaryConditionOperator(out_bdry_oper);
+        Pointer<OutsideBoundaryConditions> out_bdry_oper_rhs = new OutsideBoundaryConditions(
+            "OutsideBdryOperRhs", app_initializer->getComponentDatabase("BdryConds"), Q_in_var, time_integrator);
+        Pointer<OutsideBoundaryConditions> out_bdry_oper_sol = new OutsideBoundaryConditions(
+            "OutsideBdryOperSol", app_initializer->getComponentDatabase("BdryConds"), Q_in_var, time_integrator);
+        out_bdry_oper_rhs->setContext(time_integrator->getCurrentContext());
+        out_bdry_oper_sol->setContext(time_integrator->getPredictorContext());
+        rhs_out_oper->setBoundaryConditionOperator(out_bdry_oper_rhs);
+        sol_out_oper->setBoundaryConditionOperator(out_bdry_oper_sol);
 
         // Set up visualization plot file writer.
         Pointer<VisItDataWriter<NDIM>> visit_data_writer = app_initializer->getVisItDataWriter();
