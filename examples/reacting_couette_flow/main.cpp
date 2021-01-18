@@ -359,7 +359,7 @@ main(int argc, char* argv[])
         time_integrator->setHelmholtzSolver(Q_in_var, Q_in_helmholtz_solver);
         Pointer<InsideBoundaryConditions> in_bdry_oper_rhs = new InsideBoundaryConditions(
             "InsideBdryOperRhs", app_initializer->getComponentDatabase("BdryConds"), Q_out_var, time_integrator);
-        Pointer<InsideBoundaryConditions> ib_bdry_oper_sol = new InsideBoundaryConditions(
+        Pointer<InsideBoundaryConditions> in_bdry_oper_sol = new InsideBoundaryConditions(
             "InsideBdryOperSol", app_initializer->getComponentDatabase("BdryConds"), Q_out_var, time_integrator);
         in_bdry_oper_rhs->setContext(time_integrator->getCurrentContext());
         in_bdry_oper_sol->setContext(time_integrator->getPredictorContext());
@@ -411,7 +411,8 @@ main(int argc, char* argv[])
         const int ls_out_idx = var_db->mapVariableAndContextToIndex(ls_out_var, time_integrator->getCurrentContext());
         const int area_in_idx = var_db->mapVariableAndContextToIndex(time_integrator->getAreaVariable(ls_in_var),
                                                                      time_integrator->getCurrentContext());
-        out_bdry_oper->registerAreaAndLSInsideIndex(area_in_idx, ls_in_idx);
+        out_bdry_oper_rhs->registerAreaAndLSInsideIndex(area_in_idx, ls_in_idx);
+	out_bdry_oper_sol->registerAreaAndLSInsideIndex(area_in_idx, ls_in_idx);
 
         const int vol_in_idx = var_db->mapVariableAndContextToIndex(time_integrator->getVolumeVariable(ls_in_var),
                                                                     time_integrator->getCurrentContext());
