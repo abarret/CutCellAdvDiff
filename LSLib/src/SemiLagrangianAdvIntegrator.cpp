@@ -575,7 +575,8 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
             }
             else
             {
-                d_hier_cc_data_ops->copyData(Q_predict_idx, Q_new_idx);
+                HierarchyMathOps hier_math_ops("HierMathOps", d_hierarchy);
+                hier_math_ops.pointwiseMultiply(Q_predict_idx, Q_var, 0.5, Q_cur_idx, Q_var, 0.5, Q_new_idx, Q_var);
             }
         }
         for (const auto& Q_var : d_Q_var)
@@ -693,7 +694,8 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
                 }
                 else
                 {
-                    d_hier_cc_data_ops->copyData(Q_predict_idx, Q_new_idx);
+                    HierarchyMathOps hier_math_ops("HierMathOps", d_hierarchy);
+                    hier_math_ops.pointwiseMultiply(Q_predict_idx, Q_var, 0.5, Q_cur_idx, Q_var, 0.5, Q_new_idx, Q_var);
                 }
             }
             for (const auto& Q_var : d_Q_var)
