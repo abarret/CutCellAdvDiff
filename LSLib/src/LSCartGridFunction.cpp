@@ -15,9 +15,8 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include <IBAMR_config.h>
-
 #include "ibamr/app_namespaces.h"
+#include <ibamr/config.h>
 
 #include <SAMRAI_config.h>
 

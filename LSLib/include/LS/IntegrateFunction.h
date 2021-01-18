@@ -59,9 +59,9 @@ private:
     {
         IBTK::VectorNd X;
         IBTK::MatrixNd M;
-        M.block(0,0,3,1) = X_pts[1] - X_pts[0];
-        M.block(0,1,3,1) = X_pts[2] - X_pts[0];
-        M.block(0,2,3,1) = X_pts[3] - X_pts[0];
+        M.block(0, 0, 3, 1) = X_pts[1] - X_pts[0];
+        M.block(0, 1, 3, 1) = X_pts[2] - X_pts[0];
+        M.block(0, 2, 3, 1) = X_pts[3] - X_pts[0];
         return M * xi + X_pts[0];
     }
 #endif

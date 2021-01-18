@@ -15,7 +15,7 @@
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include <IBAMR_config.h>
+#include <ibamr/config.h>
 
 #include "LS/utility_functions.h"
 

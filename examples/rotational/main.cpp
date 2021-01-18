@@ -1,8 +1,7 @@
-#include <IBAMR_config.h>
-#include <IBTK_config.h>
-
+// Config files
 #include <ibamr/RelaxationLSMethod.h>
 #include <ibamr/app_namespaces.h>
+#include <ibamr/config.h>
 
 #include "ibtk/CartGridFunctionSet.h"
 #include "ibtk/PETScKrylovPoissonSolver.h"

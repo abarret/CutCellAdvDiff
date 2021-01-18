@@ -54,7 +54,6 @@ public:
                                double time);
 
 private:
-
     std::string d_object_name;
 
     std::shared_ptr<SBSurfaceFluidCouplingManager> d_sb_data_manager = nullptr;

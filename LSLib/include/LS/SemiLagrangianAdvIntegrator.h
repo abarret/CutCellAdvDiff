@@ -1,10 +1,9 @@
 #ifndef included_LS_SemiLagrangianAdvIntegrator
 #define included_LS_SemiLagrangianAdvIntegrator
 
-#include "IBAMR_config.h"
-
 #include "ibamr/AdvDiffHierarchyIntegrator.h"
 #include "ibamr/LSInitStrategy.h"
+#include "ibamr/config.h"
 
 #include "ibtk/PETScKrylovPoissonSolver.h"
 #include "ibtk/PoissonSolver.h"

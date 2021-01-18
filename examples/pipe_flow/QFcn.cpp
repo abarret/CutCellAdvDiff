@@ -11,7 +11,7 @@
 //
 // ---------------------------------------------------------------------
 
-#include <IBAMR_config.h>
+#include <ibamr/config.h>
 
 #include "QFcn.h"
 

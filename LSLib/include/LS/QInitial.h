@@ -143,7 +143,7 @@ private:
     VectorNd d_center = { 1.509, 1.521 };
 #endif
 #if (NDIM == 3)
-    VectorNd d_center = {1.509, 1.521, 1.514};
+    VectorNd d_center = { 1.509, 1.521, 1.514 };
 #endif
     std::array<double, NDIM> d_vel;
 

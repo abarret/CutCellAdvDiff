@@ -1,6 +1,5 @@
 #include "ibtk/DebuggingUtilities.h"
 #include "ibtk/app_namespaces.h"
-#include "ibtk/ibtk_macros.h"
 
 #include "LS/LSFromLevelSet.h"
 #include "LS/utility_functions.h"

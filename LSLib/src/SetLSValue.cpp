@@ -15,7 +15,7 @@
 #include "LS/utility_functions.h"
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include <IBAMR_config.h>
+#include <ibamr/config.h>
 
 #include <SAMRAI_config.h>
 
