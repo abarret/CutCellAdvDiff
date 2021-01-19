@@ -56,83 +56,6 @@
 
 using namespace LS;
 
-struct LocateInterface
-{
-public:
-    LocateInterface(Pointer<CellVariable<NDIM, double>> ls_var,
-                    Pointer<AdvDiffHierarchyIntegrator> integrator,
-                    Pointer<CartGridFunction> ls_fcn)
-        : d_ls_var(ls_var), d_integrator(integrator), d_ls_fcn(ls_fcn)
-    {
-        // intentionally blank
-    }
-    void resetData(const int D_idx, Pointer<HierarchyMathOps> hier_math_ops, const double time, const bool initial_time)
-    {
-        Pointer<PatchHierarchy<NDIM>> hierarchy = hier_math_ops->getPatchHierarchy();
-        if (initial_time)
-        {
-            d_ls_fcn->setDataOnPatchHierarchy(D_idx, d_ls_var, hierarchy, time, initial_time);
-        }
-        else
-        {
-            auto var_db = VariableDatabase<NDIM>::getDatabase();
-            const int ls_cur_idx = var_db->mapVariableAndContextToIndex(d_ls_var, d_integrator->getCurrentContext());
-            HierarchyCellDataOpsReal<NDIM, double> hier_cc_data_ops(hierarchy, 0, hierarchy->getFinestLevelNumber());
-            hier_cc_data_ops.copyData(D_idx, ls_cur_idx);
-        }
-    }
-
-private:
-    Pointer<CellVariable<NDIM, double>> d_ls_var;
-    Pointer<AdvDiffHierarchyIntegrator> d_integrator;
-    Pointer<CartGridFunction> d_ls_fcn;
-};
-
-void
-locateInterface(const int D_idx,
-                SAMRAI::tbox::Pointer<IBTK::HierarchyMathOps> hier_math_ops,
-                const double time,
-                const bool initial_time,
-                void* ctx)
-{
-    auto interface = (static_cast<LocateInterface*>(ctx));
-    interface->resetData(D_idx, hier_math_ops, time, initial_time);
-}
-
-void postprocess_data(Pointer<PatchHierarchy<NDIM>> hierarchy,
-                      Pointer<SemiLagrangianAdvIntegrator> integrator,
-                      Pointer<CellVariable<NDIM, double>> Q_in_var,
-                      int iteration_num,
-                      double loop_time,
-                      const std::string& dirname);
-
-void
-synchFluidConcentration(const int Q_in_idx,
-                        Pointer<CellVariable<NDIM, double>> Q_in_var,
-                        Pointer<HierarchyIntegrator> integrator,
-                        Pointer<PatchHierarchy<NDIM>> hierarchy)
-{
-    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
-        if (!level->checkAllocated(Q_in_idx)) level->allocatePatchData(Q_in_idx);
-    }
-
-    auto var_db = VariableDatabase<NDIM>::getDatabase();
-    const int Q_true_idx = var_db->mapVariableAndContextToIndex(Q_in_var, integrator->getCurrentContext());
-    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CellData<NDIM, double>> Q_in_data = patch->getPatchData(Q_in_idx);
-            Pointer<CellData<NDIM, double>> Q_true_data = patch->getPatchData(Q_true_idx);
-            Q_in_data->copy(*Q_true_data);
-        }
-    }
-}
-
 static double k_on, k_off, sf_max;
 double
 a_fcn(double Q_bdry, const std::vector<double>& fl_vals, const std::vector<double>& sf_vals, double time, void* ctx)
@@ -282,55 +205,13 @@ main(int argc, char* argv[])
         reaction_mesh.set_spatial_dimension(NDIM);
         reaction_mesh.prepare_for_use();
 
-        Mesh vol_vol_mesh(init.comm(), NDIM);
-        MeshTools::Generation::build_cube(vol_vol_mesh,
-                                          static_cast<int>(ceil(L / ds)),
-                                          static_cast<int>(ceil(1.0 / dx)),
-                                          0,
-                                          0.0,
-                                          L,
-                                          y_low,
-                                          y_up,
-                                          Utility::string_to_enum<ElemType>(bdry_elem_type));
-        BoundaryMesh vol_mesh(init.comm(), vol_vol_mesh.mesh_dimension() - 1);
-        vol_vol_mesh.boundary_info->sync(vol_mesh);
-
-        for (MeshBase::node_iterator it = vol_mesh.nodes_begin(); it != vol_mesh.nodes_end(); ++it)
-        {
-            Node* n = *it;
-            libMesh::Point& X = *n;
-            X(1) += std::tan(theta) * X(0);
-        }
-        const MeshBase::const_element_iterator end_el = vol_mesh.elements_end();
-        for (MeshBase::const_element_iterator el = vol_mesh.elements_begin(); el != end_el; ++el)
-        {
-            Elem* const elem = *el;
-            for (unsigned int side = 0; side < elem->n_sides(); ++side)
-            {
-                BoundaryInfo* boundary_info = vol_mesh.boundary_info.get();
-                const libMesh::Point& p = elem->point(side);
-                if (p(0) == 0.0 || p(0) == 8.0)
-                {
-                    boundary_info->add_side(elem, side, 0);
-                }
-                if (boundary_info->has_boundary_id(elem, side, 0) || boundary_info->has_boundary_id(elem, side, 1))
-                {
-                    s_elem_point_cache[std::make_pair(elem, side)] = elem->point(side);
-                }
-            }
-        }
-        vol_mesh.set_spatial_dimension(NDIM);
-        vol_mesh.prepare_for_use();
-
         static const int LOWER_MESH_ID = 0;
         static const int UPPER_MESH_ID = 1;
         static const int REACTION_MESH_ID = 2;
-        static const int VOL_MESH_ID = 3;
-        vector<MeshBase*> meshes(4);
+        vector<MeshBase*> meshes(3);
         meshes[LOWER_MESH_ID] = &lower_mesh_bdry;
         meshes[UPPER_MESH_ID] = &upper_mesh_bdry;
         meshes[REACTION_MESH_ID] = &reaction_mesh;
-        meshes[VOL_MESH_ID] = &vol_mesh;
 
         // Create major algorithm and data objects that comprise the
         // application.  These objects are configured from the input database
@@ -391,9 +272,6 @@ main(int argc, char* argv[])
         }
         else
         {
-            //            vol_fcn = new LSFromMesh("LSFromMesh", patch_hierarchy, &vol_mesh,
-            //            ib_method_ops->getFEDataManager(VOL_MESH_ID), true);
-            //            adv_diff_integrator->setFEDataManagerNeedsInitialization(ib_method_ops->getFEDataManager(VOL_MESH_ID));
             vol_fcn = new LSPipeFlow("LSPipeFlow",
                                      patch_hierarchy,
                                      &lower_mesh_bdry,
@@ -480,7 +358,6 @@ main(int argc, char* argv[])
         libMesh::UniquePtr<ExodusII_IO> upper_exodus_io(uses_exodus ? new ExodusII_IO(*meshes[UPPER_MESH_ID]) : NULL);
         libMesh::UniquePtr<ExodusII_IO> reaction_exodus_io(uses_exodus ? new ExodusII_IO(*meshes[REACTION_MESH_ID]) :
                                                                          NULL);
-        libMesh::UniquePtr<ExodusII_IO> vol_mesh_io(uses_exodus ? new ExodusII_IO(*meshes[VOL_MESH_ID]) : NULL);
 
         // Register a drawing variable with the data writer
         const int Q_scr_idx =
@@ -497,9 +374,6 @@ main(int argc, char* argv[])
         Pointer<CellVariable<NDIM, double>> u_draw = new CellVariable<NDIM, double>("UDraw", NDIM);
         const int u_draw_idx = var_db->registerVariableAndContext(u_draw, var_db->getContext("Scratch"));
         visit_data_writer->registerPlotQuantity("velocity", "VECTOR", u_draw_idx);
-
-        FESurfaceDistanceEvaluator surface_distance_eval(
-            "FESurfaceDistanceEvaulator", patch_hierarchy, vol_vol_mesh, vol_mesh, 1, true);
 
         ib_method_ops->initializeFEData();
         // Initialize hierarchy configuration and data on all patches.
@@ -545,8 +419,6 @@ main(int argc, char* argv[])
                     upper_exodus_filename, *upper_equation_systems, iteration_num / viz_dump_interval + 1, loop_time);
                 reaction_exodus_io->write_timestep(
                     reaction_exodus_filename, *reaction_eq_sys, iteration_num / viz_dump_interval + 1, loop_time);
-                vol_mesh_io->write_timestep(
-                    vol_exodus_filename, *vol_eq_sys, iteration_num / viz_dump_interval + 1, loop_time);
             }
             const int vol_idx = var_db->mapVariableAndContextToIndex(adv_diff_integrator->getVolumeVariable(ls_var),
                                                                      adv_diff_integrator->getCurrentContext());
@@ -600,8 +472,6 @@ main(int argc, char* argv[])
                                                     loop_time);
                     reaction_exodus_io->write_timestep(
                         reaction_exodus_filename, *reaction_eq_sys, iteration_num / viz_dump_interval + 1, loop_time);
-                    vol_mesh_io->write_timestep(
-                        vol_exodus_filename, *vol_eq_sys, iteration_num / viz_dump_interval + 1, loop_time);
                 }
                 const int vol_idx = var_db->mapVariableAndContextToIndex(adv_diff_integrator->getVolumeVariable(ls_var),
                                                                          adv_diff_integrator->getCurrentContext());
@@ -713,56 +583,6 @@ checkConservation(FEDataManager* fe_data_manager,
         output.open("TotalAmount", time == 0.0 ? std::ofstream::out : std::ofstream::app);
         output << time << " " << surface_amount << " " << fluid_amount << " " << surface_amount + fluid_amount << "\n";
     }
-}
-
-void
-updateVolumeMesh(Mesh& vol_mesh, EquationSystems* vol_eq_sys, FEDataManager* vol_fe_manager)
-{
-    System& X_sys = vol_eq_sys->get_system(vol_fe_manager->COORDINATES_SYSTEM_NAME);
-    System& X_mapping_sys = vol_eq_sys->get_system("IB coordinate mapping system");
-    DofMap& X_dof_map = X_sys.get_dof_map();
-    DofMap& X_mapping_map = X_mapping_sys.get_dof_map();
-    NumericVector<double>* X_vec = X_sys.solution.get();
-    NumericVector<double>* X_map_vec = X_mapping_sys.solution.get();
-    // Loop through lower and upper mesh
-    const MeshBase::const_element_iterator end_el = vol_mesh.elements_end();
-    for (MeshBase::const_element_iterator el = vol_mesh.elements_begin(); el != end_el; ++el)
-    {
-        Elem* const elem = *el;
-        for (unsigned int side = 0; side < elem->n_sides(); ++side)
-        {
-            BoundaryInfo* boundary_info = vol_mesh.boundary_info.get();
-            std::vector<dof_id_type> X_dofs;
-            if (boundary_info->has_boundary_id(elem, side, 0))
-            {
-                Node* node = elem->node_ptr(side);
-                for (int d = 0; d < NDIM; ++d)
-                {
-                    IBTK::get_nodal_dof_indices(X_dof_map, node, d, X_dofs);
-                    X_vec->set(X_dofs[0], s_elem_point_cache[std::make_pair(elem, side)](d));
-                    IBTK::get_nodal_dof_indices(X_mapping_map, node, d, X_dofs);
-                    X_map_vec->set(X_dofs[0], 0.0);
-                }
-            }
-            else
-            {
-                Node* node = elem->node_ptr(side);
-                libMesh::Point& p = elem->point(side);
-                for (int d = 0; d < NDIM; ++d)
-                {
-                    IBTK::get_nodal_dof_indices(X_dof_map, node, d, X_dofs);
-                    double X_val;
-                    X_vec->get(X_dofs, &X_val);
-                    p(d) = X_val;
-                    IBTK::get_nodal_dof_indices(X_mapping_map, node, d, X_dofs);
-                    X_map_vec->set(X_dofs[0], 0.0);
-                }
-            }
-        }
-    }
-    X_vec->close();
-    X_map_vec->close();
-    vol_mesh.prepare_for_use();
 }
 
 void
