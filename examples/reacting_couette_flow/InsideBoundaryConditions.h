@@ -47,5 +47,6 @@ private:
     SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_ctx;
 
     double d_k1 = std::numeric_limits<double>::quiet_NaN();
+    double d_D_coef = std::numeric_limits<double>::quiet_NaN();
 };
 #endif

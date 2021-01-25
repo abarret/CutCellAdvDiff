@@ -56,5 +56,6 @@ private:
     int d_area_in_idx = IBTK::invalid_index;
 
     double d_k1 = std::numeric_limits<double>::quiet_NaN();
+    double d_D_coef = std::numeric_limits<double>::quiet_NaN();
 };
 #endif
