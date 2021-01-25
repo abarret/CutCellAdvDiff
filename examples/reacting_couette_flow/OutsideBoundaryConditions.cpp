@@ -7,6 +7,7 @@ OutsideBoundaryConditions::OutsideBoundaryConditions(const std::string& object_n
     : LSCutCellBoundaryConditions(object_name), d_in_var(in_var), d_integrator(integrator)
 {
     d_k1 = input_db->getDouble("k1");
+    d_D_coef = input_db->getDouble("D_coef");
 }
 
 OutsideBoundaryConditions::~OutsideBoundaryConditions()
@@ -48,6 +49,7 @@ OutsideBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, dou
             Pointer<CellData<NDIM, double>> area_data = patch->getPatchData(d_area_idx);
             Pointer<CellData<NDIM, double>> area_in_data = patch->getPatchData(d_area_in_idx);
             Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(d_vol_idx);
+            Pointer<NodeData<NDIM, double>> ls_data = patch->getPatchData(d_ls_idx);
 
             for (CellIterator<NDIM> ci(box); ci; ci++)
             {
@@ -62,8 +64,36 @@ OutsideBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, dou
                 if (area > 0.0 && area_in > 0.0)
                 {
                     TBOX_ASSERT(cell_volume > 0.0);
+                    NodeIndex<NDIM> idx_ll(idx, NodeIndex<NDIM>::LowerLeft);
+                    NodeIndex<NDIM> idx_lr(idx, NodeIndex<NDIM>::LowerRight);
+                    NodeIndex<NDIM> idx_ul(idx, NodeIndex<NDIM>::UpperLeft);
+                    NodeIndex<NDIM> idx_ur(idx, NodeIndex<NDIM>::UpperRight);
+                    double dphi_dx =
+                        ((*ls_data)(idx_ur) + (*ls_data)(idx_lr) - (*ls_data)(idx_ul) - (*ls_data)(idx_ll)) /
+                        (2.0 * dx[0]);
+                    double dphi_dy =
+                        ((*ls_data)(idx_ul) + (*ls_data)(idx_ur) - (*ls_data)(idx_ll) - (*ls_data)(idx_lr)) /
+                        (2.0 * dx[1]);
+                    double dist = LS::node_to_cell(idx, *ls_data) / std::sqrt(dphi_dx * dphi_dx + dphi_dy * dphi_dy);
+                    const double out_val = (*out_data)(idx);
+                    const double in_val = (*in_data)(idx);
+#if (1)
+                    if (d_homogeneous_bdry)
+                    {
+                        (*R_data)(idx) -= 0.5 * sgn * d_k1 * (d_D_coef * out_val + dist * d_k1 * (out_val - 0.0)) /
+                                          d_D_coef * area / cell_volume;
+                    }
+                    else
+                    {
+                        (*R_data)(idx) += 0.5 * sgn * d_k1 * (d_D_coef * in_val + dist * d_k1 * (in_val - out_val)) /
+                                          d_D_coef * area / cell_volume;
+                        (*R_data)(idx) -= 0.5 * sgn * d_k1 * (d_D_coef * out_val + dist * d_k1 * (out_val - in_val)) /
+                                          d_D_coef * area / cell_volume;
+                    }
+#else
                     if (!d_homogeneous_bdry) (*R_data)(idx) += 0.5 * sgn * d_k1 * (*in_data)(idx)*area / cell_volume;
                     (*R_data)(idx) -= 0.5 * sgn * d_k1 * (*out_data)(idx)*area / cell_volume;
+#endif
                 }
             }
         }

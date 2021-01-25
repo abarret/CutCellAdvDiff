@@ -358,7 +358,7 @@ main(int argc, char* argv[])
         const int area_in_idx = var_db->mapVariableAndContextToIndex(time_integrator->getAreaVariable(ls_in_var),
                                                                      time_integrator->getCurrentContext());
         out_bdry_oper_rhs->registerAreaAndLSInsideIndex(area_in_idx, ls_in_idx);
-	out_bdry_oper_sol->registerAreaAndLSInsideIndex(area_in_idx, ls_in_idx);
+        out_bdry_oper_sol->registerAreaAndLSInsideIndex(area_in_idx, ls_in_idx);
 
         const int vol_in_idx = var_db->mapVariableAndContextToIndex(time_integrator->getVolumeVariable(ls_in_var),
                                                                     time_integrator->getCurrentContext());
