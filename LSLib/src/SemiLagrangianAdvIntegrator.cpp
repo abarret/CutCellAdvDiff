@@ -197,6 +197,7 @@ SemiLagrangianAdvIntegrator::SemiLagrangianAdvIntegrator(const std::string& obje
         d_use_rbfs = input_db->getBool("use_rbfs");
         d_rbf_stencil_size = input_db->getInteger("rbf_stencil_size");
         d_rbf_poly_order = string_to_enum<RBFPolyOrder>(input_db->getString("rbf_poly_order"));
+        d_diff_solv_iters = input_db->getInteger("diffusion_solve_iterations");
     }
 
     IBAMR_DO_ONCE(
@@ -562,21 +563,76 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
         sb_integrator->endTimestepping(current_time, d_use_strang_splitting ? half_time : new_time);
     }
 
-    for (int iter = 0; iter < 2; ++iter)
+    for (int iter = 0; iter < d_diff_solv_iters; ++iter)
     {
         for (const auto& Q_var : d_Q_var)
         {
             const int Q_cur_idx = var_db->mapVariableAndContextToIndex(Q_var, getCurrentContext());
             const int Q_new_idx = var_db->mapVariableAndContextToIndex(Q_var, getNewContext());
             const int Q_predict_idx = var_db->mapVariableAndContextToIndex(Q_var, d_predictor_context);
+            const Pointer<NodeVariable<NDIM, double>>& ls_var = d_Q_ls_map[Q_var];
+            const unsigned int l =
+                std::distance(d_ls_vars.begin(), std::find(d_ls_vars.begin(), d_ls_vars.end(), ls_var));
+            const Pointer<CellVariable<NDIM, double>>& vol_var = d_vol_vars[l];
+            const int ls_idx = var_db->mapVariableAndContextToIndex(ls_var, getCurrentContext());
+            const int vol_idx = var_db->mapVariableAndContextToIndex(vol_var, getCurrentContext());
             if (iter == 0)
             {
                 d_hier_cc_data_ops->copyData(Q_predict_idx, Q_cur_idx);
             }
             else
             {
-                HierarchyMathOps hier_math_ops("HierMathOps", d_hierarchy);
-                hier_math_ops.pointwiseMultiply(Q_predict_idx, Q_var, 0.5, Q_cur_idx, Q_var, 0.5, Q_new_idx, Q_var);
+                d_hier_cc_data_ops->copyData(Q_predict_idx, Q_new_idx);
+                //                HierarchyMathOps hier_math_ops("HierMathOps", d_hierarchy);
+                //                hier_math_ops.pointwiseMultiply(Q_predict_idx, Q_var, 0.5, Q_cur_idx, Q_var, 0.5,
+                //                Q_new_idx, Q_var);
+            }
+            // Interpolate from cell centroids to cell centers.
+            {
+                using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+                std::vector<ITC> ghost_cell_comps(1);
+                ghost_cell_comps[0] = ITC(d_Q_big_scr_idx,
+                                          Q_predict_idx,
+                                          "CONSERVATIVE_LINEAR_REFINE",
+                                          false,
+                                          "NONE",
+                                          "LINEAR",
+                                          true,
+                                          nullptr);
+                HierarchyGhostCellInterpolation hier_ghost_cell;
+                hier_ghost_cell.initializeOperatorState(ghost_cell_comps, d_hierarchy);
+                hier_ghost_cell.fillData(current_time);
+            }
+            d_rbf_reconstruct->setPatchHierarchy(d_hierarchy);
+            d_rbf_reconstruct->setLSData(ls_idx, vol_idx);
+            d_rbf_reconstruct->setUseCentroids(true);
+            for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+            {
+                Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(ln);
+                for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+                {
+                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
+                    Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+                    const double* const dx = pgeom->getDx();
+                    const double* const xlow = pgeom->getXLower();
+                    const hier::Index<NDIM>& idx_low = patch->getBox().lower();
+
+                    Pointer<CellData<NDIM, double>> Q_cur_data = patch->getPatchData(d_Q_big_scr_idx);
+                    Pointer<CellData<NDIM, double>> Q_scr_data = patch->getPatchData(Q_predict_idx);
+                    Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(vol_idx);
+                    for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
+                    {
+                        const CellIndex<NDIM>& idx = ci();
+                        if ((*vol_data)(idx) < 1.0 && (*vol_data)(idx) > 0.0)
+                        {
+                            // Reconstruct from cell centroids to cell centers
+                            VectorNd x_loc;
+                            for (int d = 0; d < NDIM; ++d)
+                                x_loc[d] = xlow[d] + dx[d] * (static_cast<double>(idx(d) - idx_low(d)) + 0.5);
+                            (*Q_scr_data)(idx) = d_rbf_reconstruct->reconstructOnIndex(x_loc, idx, *Q_cur_data, patch);
+                        }
+                    }
+                }
             }
         }
         for (const auto& Q_var : d_Q_var)
@@ -680,7 +736,7 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
             sb_integrator->integrateHierarchy(getCurrentContext(), half_time, new_time);
             sb_integrator->endTimestepping(half_time, new_time);
         }
-        for (int iter = 0; iter < 2; ++iter)
+        for (int iter = 0; iter < d_diff_solv_iters; ++iter)
         {
             for (const auto& Q_var : d_Q_var)
             {
@@ -694,8 +750,10 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
                 }
                 else
                 {
-                    HierarchyMathOps hier_math_ops("HierMathOps", d_hierarchy);
-                    hier_math_ops.pointwiseMultiply(Q_predict_idx, Q_var, 0.5, Q_cur_idx, Q_var, 0.5, Q_new_idx, Q_var);
+                    d_hier_cc_data_ops->copyData(Q_predict_idx, Q_new_idx);
+                    //                    HierarchyMathOps hier_math_ops("HierMathOps", d_hierarchy);
+                    //                    hier_math_ops.pointwiseMultiply(Q_predict_idx, Q_var, 0.5, Q_cur_idx, Q_var,
+                    //                    0.5, Q_new_idx, Q_var);
                 }
             }
             for (const auto& Q_var : d_Q_var)

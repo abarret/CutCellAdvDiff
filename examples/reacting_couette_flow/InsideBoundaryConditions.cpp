@@ -78,8 +78,8 @@ InsideBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, doub
 #if (1)
                     if (d_homogeneous_bdry)
                     {
-                        (*R_data)(idx) -= 0.5 * sgn * d_k1 * (d_D_coef * in_val + dist * d_k1 * (in_val - 0.0)) /
-                                          d_D_coef * area / cell_volume;
+                        (*R_data)(idx) -=
+                            0.5 * sgn * d_k1 * (d_D_coef * in_val) / (d_D_coef - dist * d_k1) * area / cell_volume;
                     }
                     else
                     {
