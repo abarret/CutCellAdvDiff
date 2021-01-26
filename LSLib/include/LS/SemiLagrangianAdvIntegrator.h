@@ -254,6 +254,8 @@ private:
     RBFPolyOrder d_rbf_poly_order = RBFPolyOrder::UNKNOWN_ORDER;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_predictor_context;
+
+    int d_diff_solv_iters = 2;
 }; // Class SemiLagrangianAdvIntegrator
 } // Namespace LS
 
