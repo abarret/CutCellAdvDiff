@@ -17,6 +17,17 @@ namespace LS
 
 #define LS_TIMER_STOP(timer) timer->stop();
 
+#define LS_DO_ONCE(task)                                                                                               \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        static bool done = false;                                                                                      \
+        if (done == false)                                                                                             \
+        {                                                                                                              \
+            task;                                                                                                      \
+            done = true;                                                                                               \
+        }                                                                                                              \
+    } while (0);
+
 static double s_eps = 1.0e-12;
 inline double
 length_fraction(const double dx, const double phi_l, const double phi_u)

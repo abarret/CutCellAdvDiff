@@ -1,7 +1,5 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
-#include "ibamr/ibamr_utilities.h"
-
 #include "ibtk/CellNoCornersFillPattern.h"
 #include "ibtk/DebuggingUtilities.h"
 #include "ibtk/HierarchyGhostCellInterpolation.h"
@@ -76,15 +74,15 @@ LSCutCellLaplaceOperator::LSCutCellLaplaceOperator(const std::string& object_nam
     d_Q_scr_idx = var_db->registerVariableAndContext(
         d_Q_var, var_db->getContext(d_object_name + "::SCRATCH"), input_db->getInteger("stencil_size"));
 
-    IBAMR_DO_ONCE(t_compute_helmholtz =
-                      TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::computeHelmholtzAction()");
-                  t_extrapolate =
-                      TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::extrapolateToCellCenters()");
-                  t_apply = TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::apply()");
-                  t_find_cell_centroid =
-                      TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::find_cell_centroid");
-                  t_find_system = TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::find_system");
-                  t_solve_system = TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::solve_system"););
+    LS_DO_ONCE(t_compute_helmholtz =
+                   TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::computeHelmholtzAction()");
+               t_extrapolate =
+                   TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::extrapolateToCellCenters()");
+               t_apply = TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::apply()");
+               t_find_cell_centroid =
+                   TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::find_cell_centroid");
+               t_find_system = TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::find_system");
+               t_solve_system = TimerManager::getManager()->getTimer("LS::LSCutCellLaplaceOperator::solve_system"););
     return;
 } // LSCutCellLaplaceOperator()
 
