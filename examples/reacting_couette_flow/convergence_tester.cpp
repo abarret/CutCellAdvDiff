@@ -28,7 +28,8 @@
 #include <ibtk/HierarchyGhostCellInterpolation.h>
 #include <ibtk/HierarchyMathOps.h>
 
-#include "LS/LSFromLevelSet.h"
+#include "LS/LSFindCellVolume.h"
+#include "LS/utility_functions.h"
 
 #include "BoxArray.h"
 #include "CartesianPatchGeometry.h"
@@ -39,6 +40,55 @@
 #include "RefineAlgorithm.h"
 
 using namespace LS;
+
+static double a = std::numeric_limits<double>::signaling_NaN();
+static double b = std::numeric_limits<double>::signaling_NaN();
+
+void output_to_file(const int Q_idx,
+                    const int area_idx,
+                    const int vol_idx,
+                    const int ls_interior_idx,
+                    const std::string& file_name,
+                    const double loop_time,
+                    Pointer<PatchHierarchy<NDIM>> hierarchy);
+void
+outputBdryInfo(const int Q_idx,
+               const int Q_scr_idx,
+               const int ls_interior_idx,
+               const int vol_idx,
+               const int area_idx,
+               const double current_time,
+               const int iteration_num,
+               Pointer<PatchHierarchy<NDIM>> hierarchy,
+               std::string base_name)
+{
+    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
+        if (!level->checkAllocated(Q_scr_idx)) level->allocatePatchData(Q_scr_idx);
+    }
+
+    using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+    std::vector<ITC> ghost_cell_comps(1);
+    ghost_cell_comps[0] = ITC(Q_scr_idx, Q_idx, "CONSERVATIVE_LINEAR_REFINE", false, "NONE", "LINEAR", false, nullptr);
+    HierarchyGhostCellInterpolation hier_ghost_cells;
+    hier_ghost_cells.initializeOperatorState(ghost_cell_comps, hierarchy, 0, hierarchy->getFinestLevelNumber());
+    hier_ghost_cells.fillData(current_time);
+
+    output_to_file(Q_scr_idx,
+                   area_idx,
+                   vol_idx,
+                   ls_interior_idx,
+                   base_name + std::to_string(iteration_num),
+                   current_time,
+                   hierarchy);
+
+    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
+        level->deallocatePatchData(Q_scr_idx);
+    }
+}
 
 /*******************************************************************************
  * For each run, the input filename must be given on the command line.  In all *
@@ -101,6 +151,9 @@ main(int argc, char* argv[])
         TBOX_ERROR("key `fine_hier_dump_dirname' not specified in input file");
     }
 
+    a = input_db->getDouble("A");
+    b = input_db->getDouble("B");
+
     // Create major algorithm and data objects that comprise application.
     Pointer<CartesianGridGeometry<NDIM>> grid_geom = new CartesianGridGeometry<NDIM>(
         "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
@@ -132,6 +185,11 @@ main(int argc, char* argv[])
     const int vol_in_idx = var_db->registerVariableAndContext(vol_in_var, current_ctx, IntVector<NDIM>(2));
     const int vol_out_idx = var_db->registerVariableAndContext(vol_out_var, current_ctx, IntVector<NDIM>(2));
 
+    Pointer<CellVariable<NDIM, double>> area_in_var = new CellVariable<NDIM, double>("Area In"),
+                                        area_out_var = new CellVariable<NDIM, double>("Area Out");
+    const int area_in_idx = var_db->registerVariableAndContext(area_in_var, current_ctx, IntVector<NDIM>(2));
+    const int area_out_idx = var_db->registerVariableAndContext(area_out_var, current_ctx, IntVector<NDIM>(2));
+
     Pointer<CellVariable<NDIM, int>> rank_var = new CellVariable<NDIM, int>("Rank");
     const int rank_idx = var_db->registerVariableAndContext(rank_var, current_ctx);
 
@@ -146,6 +204,8 @@ main(int argc, char* argv[])
     visit_data_writer->registerPlotQuantity("ls_out", "SCALAR", ls_out_idx);
     visit_data_writer->registerPlotQuantity("vol_in", "SCALAR", vol_in_idx);
     visit_data_writer->registerPlotQuantity("vol_out", "SCALAR", vol_out_idx);
+    visit_data_writer->registerPlotQuantity("area_in", "SCALAR", area_in_idx);
+    visit_data_writer->registerPlotQuantity("area_out", "SCALAR", area_out_idx);
     visit_data_writer->registerPlotQuantity("rank", "SCALAR", rank_idx);
 
     // Time step loop.
@@ -154,7 +214,7 @@ main(int argc, char* argv[])
     int fine_iteration_num = fine_hier_dump_interval;
 
     bool files_exist = true;
-    int iter_number = 0;
+    int draw_iter = 0;
     for (; files_exist;
          coarse_iteration_num += coarse_hier_dump_interval, fine_iteration_num += fine_hier_dump_interval)
     {
@@ -253,6 +313,8 @@ main(int argc, char* argv[])
             level->allocatePatchData(ls_out_idx, loop_time);
             level->allocatePatchData(vol_in_idx, loop_time);
             level->allocatePatchData(vol_out_idx, loop_time);
+            level->allocatePatchData(area_in_idx, loop_time);
+            level->allocatePatchData(area_out_idx, loop_time);
             level->allocatePatchData(Q_in_scr_idx, loop_time);
             level->allocatePatchData(Q_out_scr_idx, loop_time);
             level->allocatePatchData(rank_idx, loop_time);
@@ -269,6 +331,8 @@ main(int argc, char* argv[])
             level->allocatePatchData(ls_out_idx, loop_time);
             level->allocatePatchData(vol_in_idx, loop_time);
             level->allocatePatchData(vol_out_idx, loop_time);
+            level->allocatePatchData(area_in_idx, loop_time);
+            level->allocatePatchData(area_out_idx, loop_time);
             level->allocatePatchData(rank_idx, loop_time);
         }
 
@@ -294,30 +358,21 @@ main(int argc, char* argv[])
             current_ctx, "OutsideLSFcn", nullptr, ls_in_var, app_initializer->getComponentDatabase("OutsideLSFcn"));
         {
             // Coarse patch hierarchy
-            Pointer<LSFromLevelSet> vol_fcn = new LSFromLevelSet("VolFcn", coarse_patch_hierarchy);
-            vol_fcn->registerLSFcn(ls_in_fcn);
-            vol_fcn->updateVolumeAreaSideLS(vol_in_idx,
-                                            vol_in_var,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            ls_in_idx,
-                                            ls_in_var,
-                                            loop_time,
-                                            true);
-            vol_fcn->registerLSFcn(ls_out_fcn);
-            vol_fcn->updateVolumeAreaSideLS(vol_out_idx,
-                                            vol_out_var,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            ls_out_idx,
-                                            ls_out_var,
-                                            loop_time,
-                                            true);
+            Pointer<LSFindCellVolume> vol_fcn = new LSFindCellVolume("VolFcn", coarse_patch_hierarchy);
+            ls_in_fcn->setDataOnPatchHierarchy(ls_in_idx, ls_in_var, coarse_patch_hierarchy, loop_time);
+            ls_out_fcn->setDataOnPatchHierarchy(ls_out_idx, ls_out_var, coarse_patch_hierarchy, loop_time);
 
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comps(2);
+            ghost_cell_comps[0] = ITC(ls_in_idx, "LINEAR_REFINE", false, "NONE", "LINEAR");
+            ghost_cell_comps[1] = ITC(ls_out_idx, "LINEAR_REFINE", false, "NONE", "LINEAR");
+            HierarchyGhostCellInterpolation hier_ghost_cell;
+            hier_ghost_cell.initializeOperatorState(ghost_cell_comps, coarse_patch_hierarchy);
+            hier_ghost_cell.fillData(loop_time);
+
+            vol_fcn->updateVolumeAndArea(vol_in_idx, vol_in_var, area_in_idx, area_in_var, ls_in_idx, ls_in_var, true);
+            vol_fcn->updateVolumeAndArea(
+                vol_out_idx, vol_out_var, area_out_idx, area_out_var, ls_out_idx, ls_out_var, true);
             for (int ln = 0; ln <= coarse_patch_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = coarse_patch_hierarchy->getPatchLevel(ln);
@@ -332,30 +387,21 @@ main(int argc, char* argv[])
 
         {
             // Fine patch hierarchy
-            Pointer<LSFromLevelSet> vol_fcn = new LSFromLevelSet("VolFcn", fine_patch_hierarchy);
-            vol_fcn->registerLSFcn(ls_in_fcn);
-            vol_fcn->updateVolumeAreaSideLS(vol_in_idx,
-                                            vol_in_var,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            ls_in_idx,
-                                            ls_in_var,
-                                            loop_time,
-                                            true);
-            vol_fcn->registerLSFcn(ls_out_fcn);
-            vol_fcn->updateVolumeAreaSideLS(vol_out_idx,
-                                            vol_out_var,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            ls_out_idx,
-                                            ls_out_var,
-                                            loop_time,
-                                            true);
+            Pointer<LSFindCellVolume> vol_fcn = new LSFindCellVolume("VolFcn", fine_patch_hierarchy);
+            ls_in_fcn->setDataOnPatchHierarchy(ls_in_idx, ls_in_var, fine_patch_hierarchy, loop_time);
+            ls_out_fcn->setDataOnPatchHierarchy(ls_out_idx, ls_out_var, fine_patch_hierarchy, loop_time);
 
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comps(2);
+            ghost_cell_comps[0] = ITC(ls_in_idx, "LINEAR_REFINE", false, "NONE", "LINEAR");
+            ghost_cell_comps[1] = ITC(ls_out_idx, "LINEAR_REFINE", false, "NONE", "LINEAR");
+            HierarchyGhostCellInterpolation hier_ghost_cell;
+            hier_ghost_cell.initializeOperatorState(ghost_cell_comps, fine_patch_hierarchy);
+            hier_ghost_cell.fillData(loop_time);
+
+            vol_fcn->updateVolumeAndArea(vol_in_idx, vol_in_var, area_in_idx, area_in_var, ls_in_idx, ls_in_var, true);
+            vol_fcn->updateVolumeAndArea(
+                vol_out_idx, vol_out_var, area_out_idx, area_out_var, ls_out_idx, ls_out_var, true);
             for (int ln = 0; ln <= fine_patch_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = fine_patch_hierarchy->getPatchLevel(ln);
@@ -370,30 +416,22 @@ main(int argc, char* argv[])
 
         {
             // Coarsened fine patch hierarchy
-            Pointer<LSFromLevelSet> vol_fcn = new LSFromLevelSet("VolFcn", coarsened_fine_patch_hierarchy);
-            vol_fcn->registerLSFcn(ls_in_fcn);
-            vol_fcn->updateVolumeAreaSideLS(vol_in_idx,
-                                            vol_in_var,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            ls_in_idx,
-                                            ls_in_var,
-                                            loop_time,
-                                            true);
-            vol_fcn->registerLSFcn(ls_out_fcn);
-            vol_fcn->updateVolumeAreaSideLS(vol_out_idx,
-                                            vol_out_var,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            IBTK::invalid_index,
-                                            nullptr,
-                                            ls_out_idx,
-                                            ls_out_var,
-                                            loop_time,
-                                            true);
+            Pointer<LSFindCellVolume> vol_fcn = new LSFindCellVolume("VolFcn", coarsened_fine_patch_hierarchy);
+            ls_in_fcn->setDataOnPatchHierarchy(ls_in_idx, ls_in_var, coarsened_fine_patch_hierarchy, loop_time);
+            ls_out_fcn->setDataOnPatchHierarchy(ls_out_idx, ls_out_var, coarsened_fine_patch_hierarchy, loop_time);
 
+            using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
+            std::vector<ITC> ghost_cell_comps(2);
+            ghost_cell_comps[0] = ITC(ls_in_idx, "LINEAR_REFINE", false, "NONE", "LINEAR");
+            ghost_cell_comps[1] = ITC(ls_out_idx, "LINEAR_REFINE", false, "NONE", "LINEAR");
+            HierarchyGhostCellInterpolation hier_ghost_cell;
+            hier_ghost_cell.initializeOperatorState(ghost_cell_comps, coarsened_fine_patch_hierarchy);
+            hier_ghost_cell.fillData(loop_time);
+
+            vol_fcn->updateVolumeAndArea(
+                vol_in_idx, vol_in_var, IBTK::invalid_index, nullptr, ls_in_idx, ls_in_var, true);
+            vol_fcn->updateVolumeAndArea(
+                vol_out_idx, vol_out_var, IBTK::invalid_index, nullptr, ls_out_idx, ls_out_var, true);
             for (int ln = 0; ln <= coarsened_fine_patch_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = coarsened_fine_patch_hierarchy->getPatchLevel(ln);
@@ -502,10 +540,48 @@ main(int argc, char* argv[])
                 ->fillData(loop_time);
         }
 
+        // Output boundary information
+        outputBdryInfo(Q_in_idx,
+                       Q_in_scr_idx,
+                       ls_in_idx,
+                       vol_in_idx,
+                       area_in_idx,
+                       loop_time,
+                       coarse_iteration_num,
+                       coarse_patch_hierarchy,
+                       "coarse/in_bdry_info_");
+        outputBdryInfo(Q_in_idx,
+                       Q_in_scr_idx,
+                       ls_in_idx,
+                       vol_in_idx,
+                       area_in_idx,
+                       loop_time,
+                       fine_iteration_num,
+                       fine_patch_hierarchy,
+                       "fine/in_bdry_info_");
+        outputBdryInfo(Q_out_idx,
+                       Q_out_scr_idx,
+                       ls_out_idx,
+                       vol_out_idx,
+                       area_in_idx,
+                       loop_time,
+                       coarse_iteration_num,
+                       coarse_patch_hierarchy,
+                       "coarse/out_bdry_info_");
+        outputBdryInfo(Q_out_idx,
+                       Q_out_scr_idx,
+                       ls_out_idx,
+                       vol_out_idx,
+                       area_in_idx,
+                       loop_time,
+                       fine_iteration_num,
+                       fine_patch_hierarchy,
+                       "fine/out_bdry_info_");
+
         // Output plot data before taking norms of differences.
-        visit_data_writer->writePlotData(coarse_patch_hierarchy, iter_number++, loop_time);
-        visit_data_writer->writePlotData(coarsened_fine_patch_hierarchy, iter_number++, loop_time);
-        visit_data_writer->writePlotData(fine_patch_hierarchy, iter_number++, loop_time);
+        visit_data_writer->writePlotData(coarse_patch_hierarchy, draw_iter++, loop_time);
+        visit_data_writer->writePlotData(coarsened_fine_patch_hierarchy, draw_iter++, loop_time);
+        visit_data_writer->writePlotData(fine_patch_hierarchy, draw_iter++, loop_time);
 
         // Compute norms of differences.
         coarse_hier_cc_data_ops.subtract(Q_in_idx, Q_in_idx, Q_in_interp_idx);
@@ -541,9 +617,9 @@ main(int argc, char* argv[])
 
         pout << "\n"
              << "Error in " << Q_in_var->getName() << " at time " << loop_time << ":\n"
-             << "  Q_in_L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Q_in_idx, wgt_cc_idx) << "\n"
-             << "  Q_in_L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Q_in_idx, wgt_cc_idx) << "\n"
-             << "  Q_in_max-norm: " << coarse_hier_cc_data_ops.maxNorm(Q_in_idx, wgt_cc_idx) << "\n";
+             << "  In_L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Q_in_idx, wgt_cc_idx) << "\n"
+             << "  In_L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Q_in_idx, wgt_cc_idx) << "\n"
+             << "  In_max-norm: " << coarse_hier_cc_data_ops.maxNorm(Q_in_idx, wgt_cc_idx) << "\n";
 
         hier_math_ops.resetLevels(0, coarse_patch_hierarchy->getFinestLevelNumber());
         for (int ln = 0; ln <= coarse_patch_hierarchy->getFinestLevelNumber(); ++ln)
@@ -575,12 +651,12 @@ main(int argc, char* argv[])
 
         pout << "\n"
              << "Error in " << Q_out_var->getName() << " at time " << loop_time << ":\n"
-             << "  Q_out_L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Q_out_idx, wgt_cc_idx) << "\n"
-             << "  Q_out_L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Q_out_idx, wgt_cc_idx) << "\n"
-             << "  Q_out_max-norm: " << coarse_hier_cc_data_ops.maxNorm(Q_out_idx, wgt_cc_idx) << "\n";
+             << "  Out_L1-norm:  " << coarse_hier_cc_data_ops.L1Norm(Q_out_idx, wgt_cc_idx) << "\n"
+             << "  Out_L2-norm:  " << coarse_hier_cc_data_ops.L2Norm(Q_out_idx, wgt_cc_idx) << "\n"
+             << "  Out_max-norm: " << coarse_hier_cc_data_ops.maxNorm(Q_out_idx, wgt_cc_idx) << "\n";
 
         // Output plot data after taking norms of differences.
-        visit_data_writer->writePlotData(coarse_patch_hierarchy, iter_number++, loop_time);
+        visit_data_writer->writePlotData(coarse_patch_hierarchy, draw_iter++, loop_time);
 
         pout << endl;
         pout << "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
@@ -591,3 +667,175 @@ main(int argc, char* argv[])
     SAMRAI_MPI::finalize();
     return 0;
 } // main
+
+void
+output_to_file(const int Q_idx,
+               const int area_idx,
+               const int vol_idx,
+               const int ls_interp_idx,
+               const std::string& file_name,
+               const double loop_time,
+               Pointer<PatchHierarchy<NDIM>> hierarchy)
+{
+    auto var_db = VariableDatabase<NDIM>::getDatabase();
+    Pointer<hier::Variable<NDIM>> Q_var;
+    var_db->mapIndexToVariable(Q_idx, Q_var);
+    std::ofstream bdry_stream;
+    if (SAMRAI_MPI::getRank() == 0) bdry_stream.open(file_name.c_str(), std::ofstream::out);
+    // data structure to hold bdry data : (theta, bdry_val)
+    std::vector<double> theta_data, val_data;
+    // We only care about data on the finest level
+    Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(hierarchy->getFinestLevelNumber());
+    double integral = 0.0;
+    double tot_area = 0.0;
+    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+    {
+        Pointer<Patch<NDIM>> patch = level->getPatch(p());
+        Pointer<CellData<NDIM, double>> Q_data = patch->getPatchData(Q_idx);
+        Pointer<CellData<NDIM, double>> area_data = patch->getPatchData(area_idx);
+        Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(vol_idx);
+        Pointer<NodeData<NDIM, double>> ls_data = patch->getPatchData(ls_interp_idx);
+        Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+        const double* const dx = pgeom->getDx();
+        const double* const x_low = pgeom->getXLower();
+        const Box<NDIM>& box = patch->getBox();
+        const hier::Index<NDIM>& idx_low = box.lower();
+        for (CellIterator<NDIM> ci(box); ci; ci++)
+        {
+            const CellIndex<NDIM>& idx = ci();
+            const double area = (*area_data)(idx);
+            if (area > 0.0 && (*vol_data)(idx) > 0.0)
+            {
+                std::array<VectorNd, 2> X_bounds;
+                int l = 0;
+                const NodeIndex<NDIM> idx_ll(idx, IntVector<NDIM>(0, 0)), idx_uu(idx, IntVector<NDIM>(1, 1)),
+                    idx_lu(idx, IntVector<NDIM>(0, 1)), idx_ul(idx, IntVector<NDIM>(1, 0));
+                const double phi_ll = (*ls_data)(idx_ll), phi_uu = (*ls_data)(idx_uu), phi_lu = (*ls_data)(idx_lu),
+                             phi_ul = (*ls_data)(idx_ul);
+                VectorNd X_ll(idx(0), idx(1)), X_uu(idx(0) + 1.0, idx(1) + 1.0), X_lu(idx(0), idx(1) + 1.0),
+                    X_ul(idx(0) + 1.0, idx(1));
+                if (phi_ll * phi_lu < 0.0)
+                {
+                    X_bounds[l] = midpoint_value(X_ll, phi_ll, X_lu, phi_lu);
+                    l++;
+                }
+                if (phi_lu * phi_uu < 0.0)
+                {
+                    X_bounds[l] = midpoint_value(X_lu, phi_lu, X_uu, phi_uu);
+                    l++;
+                }
+                if (phi_uu * phi_ul < 0.0)
+                {
+                    X_bounds[l] = midpoint_value(X_uu, phi_uu, X_ul, phi_ul);
+                    l++;
+                }
+                if (phi_ul * phi_ll < 0.0)
+                {
+                    X_bounds[l] = midpoint_value(X_ul, phi_ul, X_ll, phi_ll);
+                    l++;
+                }
+                TBOX_ASSERT(l == 2);
+                VectorNd X = 0.5 * (X_bounds[0] + X_bounds[1]);
+                VectorNd X_phys;
+                for (int d = 0; d < NDIM; ++d) X_phys[d] = x_low[d] + dx[d] * (X(d) - static_cast<double>(idx_low(d)));
+                double cur_theta = std::atan2(X_phys[1], X_phys[0]);
+                double cur_r = X_phys.norm();
+                double ref_theta =
+                    cur_theta + (a * cur_r + b / cur_r) * (2.0 / (2.0 * M_PI)) * std::cos(2 * M_PI * loop_time / 2.0) -
+                    (a * cur_r + b / cur_r) * (2.0 / (2.0 * M_PI));
+                VectorNd X_new_coords = { cur_r * std::cos(ref_theta), cur_r * std::sin(ref_theta) };
+                X_new_coords[0] -= 1.521;
+                X_new_coords[1] -= 1.503;
+                double theta = std::atan2(X_new_coords[1], X_new_coords[0]);
+                theta_data.push_back(theta);
+                // Calculate a delta theta for integral calculations
+                double d_theta = area;
+
+                // Do least squares linear approximation to find Q_val
+                Box<NDIM> box_ls(idx, idx);
+                box_ls.grow(2);
+                std::vector<double> Q_vals;
+                std::vector<VectorNd> X_vals;
+                for (CellIterator<NDIM> ci(box_ls); ci; ci++)
+                {
+                    const CellIndex<NDIM>& idx_c = ci();
+                    if ((*vol_data)(idx_c) > 0.0)
+                    {
+                        // Use this point
+                        Q_vals.push_back((*Q_data)(idx_c));
+                        X_vals.push_back(find_cell_centroid(idx_c, *ls_data));
+                    }
+                }
+                const int m = Q_vals.size();
+                MatrixXd A(MatrixXd::Zero(m, NDIM + 1));
+                VectorXd U(VectorXd::Zero(m));
+                for (size_t i = 0; i < Q_vals.size(); ++i)
+                {
+                    const VectorNd disp = X_vals[i] - X;
+                    double w = std::sqrt(std::exp(-disp.norm() * disp.norm()));
+                    A(i, 2) = w * disp[1];
+                    A(i, 1) = w * disp[0];
+                    A(i, 0) = w;
+                    U(i) = w * Q_vals[i];
+                }
+
+                VectorXd soln = A.fullPivHouseholderQr().solve(U);
+                val_data.push_back(soln(0));
+                integral += soln(0) * d_theta;
+                tot_area += d_theta;
+            }
+        }
+    }
+    integral = SAMRAI_MPI::sumReduction(integral);
+    tot_area = SAMRAI_MPI::sumReduction(tot_area);
+    pout << "Integral at time: " << loop_time << " for variable: " << Q_var->getName()
+         << " is: " << std::setprecision(12) << integral << "\n";
+    pout << "Area     at time: " << loop_time << " for variable: " << Q_var->getName()
+         << " is: " << std::setprecision(12) << tot_area << "\n";
+    // Now we need to send the data to processor rank 0 for outputting
+    if (SAMRAI_MPI::getRank() == 0)
+    {
+        const int num_procs = SAMRAI_MPI::getNodes();
+        std::vector<int> data_per_proc(num_procs - 1);
+        for (int i = 1; i < num_procs; ++i)
+        {
+            MPI_Recv(&data_per_proc[i - 1], 1, MPI_INT, i, 0, SAMRAI_MPI::commWorld, nullptr);
+        }
+        std::vector<std::vector<double>> theta_per_proc(num_procs - 1), val_per_proc(num_procs - 1);
+        for (int i = 1; i < num_procs; ++i)
+        {
+            theta_per_proc[i - 1].resize(data_per_proc[i - 1]);
+            val_per_proc[i - 1].resize(data_per_proc[i - 1]);
+            MPI_Recv(
+                theta_per_proc[i - 1].data(), data_per_proc[i - 1], MPI_DOUBLE, i, 0, SAMRAI_MPI::commWorld, nullptr);
+            MPI_Recv(
+                val_per_proc[i - 1].data(), data_per_proc[i - 1], MPI_DOUBLE, i, 0, SAMRAI_MPI::commWorld, nullptr);
+        }
+        // Root processor now has all the data. Sort it and print it
+        std::map<double, double> theta_val_data;
+        // Start with root processor
+        for (size_t i = 0; i < theta_data.size(); ++i) theta_val_data[theta_data[i]] = val_data[i];
+        // Now loop through remaining processors
+        for (int i = 1; i < num_procs; ++i)
+        {
+            for (size_t j = 0; j < theta_per_proc[i - 1].size(); ++j)
+            {
+                theta_val_data[theta_per_proc[i - 1][j]] = val_per_proc[i - 1][j];
+            }
+        }
+        bdry_stream << std::setprecision(10) << loop_time << "\n";
+        for (const auto& theta_val_pair : theta_val_data)
+        {
+            bdry_stream << theta_val_pair.first << " " << theta_val_pair.second << "\n";
+        }
+        bdry_stream.close();
+    }
+    else
+    {
+        TBOX_ASSERT(theta_data.size() == val_data.size());
+        int num_data = theta_data.size();
+        MPI_Send(&num_data, 1, MPI_INT, 0, 0, SAMRAI_MPI::commWorld);
+        MPI_Send(theta_data.data(), theta_data.size(), MPI_DOUBLE, 0, 0, SAMRAI_MPI::commWorld);
+        MPI_Send(val_data.data(), val_data.size(), MPI_DOUBLE, 0, 0, SAMRAI_MPI::commWorld);
+    }
+}
