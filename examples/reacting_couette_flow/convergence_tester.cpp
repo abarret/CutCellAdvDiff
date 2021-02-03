@@ -373,9 +373,9 @@ main(int argc, char* argv[])
             hier_ghost_cell.fillData(loop_time);
 
             vol_in_fcn->updateVolumeAreaSideLS(
-                vol_in_idx, vol_in_var, area_in_idx, area_in_var, -1, nullptr, ls_in_idx, ls_in_var, true);
+                vol_in_idx, vol_in_var, area_in_idx, area_in_var, -1, nullptr, ls_in_idx, ls_in_var, loop_time, true);
             vol_out_fcn->updateVolumeAreaSideLS(
-                vol_out_idx, vol_out_var, area_out_idx, area_out_var, -1, nullptr, ls_out_idx, ls_out_var, true);
+                vol_out_idx, vol_out_var, area_out_idx, area_out_var, -1, nullptr, ls_out_idx, ls_out_var, loop_time, true);
             for (int ln = 0; ln <= coarse_patch_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = coarse_patch_hierarchy->getPatchLevel(ln);
@@ -404,9 +404,9 @@ main(int argc, char* argv[])
             hier_ghost_cell.fillData(loop_time);
 
             vol_in_fcn->updateVolumeAreaSideLS(
-                vol_in_idx, vol_in_var, area_in_idx, area_in_var, -1, nullptr, ls_in_idx, ls_in_var, true);
+                vol_in_idx, vol_in_var, area_in_idx, area_in_var, -1, nullptr, ls_in_idx, ls_in_var, loop_time, true);
             vol_out_fcn->updateVolumeAreaSideLS(
-                vol_out_idx, vol_out_var, area_out_idx, area_out_var, -1, nullptr, ls_out_idx, ls_out_var, true);
+                vol_out_idx, vol_out_var, area_out_idx, area_out_var, -1, nullptr, ls_out_idx, ls_out_var, loop_time, true);
             for (int ln = 0; ln <= fine_patch_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = fine_patch_hierarchy->getPatchLevel(ln);
@@ -435,15 +435,15 @@ main(int argc, char* argv[])
             hier_ghost_cell.fillData(loop_time);
 
             vol_in_fcn->updateVolumeAreaSideLS(
-                vol_in_idx, vol_in_var, area_in_idx, area_in_var, -1, nullptr, ls_in_idx, ls_in_var, true);
+                vol_in_idx, vol_in_var, -1, nullptr, -1, nullptr, ls_in_idx, ls_in_var, loop_time, true);
             vol_out_fcn->updateVolumeAreaSideLS(
-                vol_out_idx, vol_out_var, area_out_idx, area_out_var, -1, nullptr, ls_out_idx, ls_out_var, true);
+                vol_out_idx, vol_out_var, -1, nullptr, -1, nullptr, ls_out_idx, ls_out_var, loop_time, true);
             for (int ln = 0; ln <= coarsened_fine_patch_hierarchy->getFinestLevelNumber(); ++ln)
             {
                 Pointer<PatchLevel<NDIM>> level = coarsened_fine_patch_hierarchy->getPatchLevel(ln);
                 for (PatchLevel<NDIM>::Iterator p(level); p; p++)
                 {
-                    Pointer<Patch<NDIM>> patch = level->getPatch(p());
+		    Pointer<Patch<NDIM>> patch = level->getPatch(p());
                     Pointer<CellData<NDIM, int>> rank_data = patch->getPatchData(rank_idx);
                     rank_data->fillAll(SAMRAI_MPI::getRank());
                 }
