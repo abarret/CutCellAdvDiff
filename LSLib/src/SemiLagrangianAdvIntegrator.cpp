@@ -197,7 +197,7 @@ SemiLagrangianAdvIntegrator::SemiLagrangianAdvIntegrator(const std::string& obje
         d_use_rbfs = input_db->getBool("use_rbfs");
         d_rbf_stencil_size = input_db->getInteger("rbf_stencil_size");
         d_rbf_poly_order = string_to_enum<RBFPolyOrder>(input_db->getString("rbf_poly_order"));
-        d_diff_solv_iters = input_db->getInteger("diffusion_solve_iterations");
+        d_diff_solv_iters = input_db->getIntegerWithDefault("diffusion_solve_iterations", d_diff_solv_iters);
     }
 
     IBAMR_DO_ONCE(
@@ -686,17 +686,7 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
             const Pointer<CellVariable<NDIM, double>>& vol_var = d_vol_vars[l];
             const int ls_idx = var_db->mapVariableAndContextToIndex(ls_var, getCurrentContext());
             const int vol_idx = var_db->mapVariableAndContextToIndex(vol_var, getCurrentContext());
-            if (iter == 0)
-            {
-                d_hier_cc_data_ops->copyData(Q_predict_idx, Q_cur_idx);
-            }
-            else
-            {
-                d_hier_cc_data_ops->copyData(Q_predict_idx, Q_new_idx);
-                //                HierarchyMathOps hier_math_ops("HierMathOps", d_hierarchy);
-                //                hier_math_ops.pointwiseMultiply(Q_predict_idx, Q_var, 0.5, Q_cur_idx, Q_var, 0.5,
-                //                Q_new_idx, Q_var);
-            }
+            d_hier_cc_data_ops->copyData(Q_predict_idx, iter == 0 ? Q_cur_idx : Q_new_idx);
             // Interpolate from cell centroids to cell centers.
             {
                 using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
@@ -926,17 +916,8 @@ SemiLagrangianAdvIntegrator::integrateHierarchy(const double current_time, const
                 const int Q_cur_idx = var_db->mapVariableAndContextToIndex(Q_var, getCurrentContext());
                 const int Q_predict_idx = var_db->mapVariableAndContextToIndex(Q_var, d_predictor_context);
                 if (iter == 0)
-                {
                     d_hier_cc_data_ops->copyData(Q_cur_idx, Q_new_idx);
-                    d_hier_cc_data_ops->copyData(Q_predict_idx, Q_cur_idx);
-                }
-                else
-                {
-                    d_hier_cc_data_ops->copyData(Q_predict_idx, Q_new_idx);
-                    //                    HierarchyMathOps hier_math_ops("HierMathOps", d_hierarchy);
-                    //                    hier_math_ops.pointwiseMultiply(Q_predict_idx, Q_var, 0.5, Q_cur_idx, Q_var,
-                    //                    0.5, Q_new_idx, Q_var);
-                }
+                d_hier_cc_data_ops->copyData(Q_predict_idx, iter == 0 ? Q_cur_idx : Q_new_idx);
             }
             for (const auto& Q_var : d_Q_var)
             {

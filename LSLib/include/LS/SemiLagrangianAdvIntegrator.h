@@ -255,7 +255,7 @@ private:
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> d_predictor_context;
 
-    int d_diff_solv_iters = 2;
+    int d_diff_solv_iters = 1;
 }; // Class SemiLagrangianAdvIntegrator
 } // Namespace LS
 
