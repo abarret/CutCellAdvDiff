@@ -16,6 +16,7 @@ static Timer* t_applyBoundaryCondition = nullptr;
 static Timer* t_interpolateToBoundary = nullptr;
 static Timer* t_allocateOperatorState = nullptr;
 static Timer* t_deallocateOperatorState = nullptr;
+static Timer* t_cache_boundary_data = nullptr;
 } // namespace
 
 namespace LS
@@ -23,12 +24,14 @@ namespace LS
 SBBoundaryConditions::SBBoundaryConditions(const std::string& object_name,
                                            Pointer<Database> input_db,
                                            Mesh* mesh,
-                                           FEDataManager* fe_data_manager)
+                                           FEDataManager* fe_data_manager,
+                                           bool use_old_soln)
     : LSCutCellBoundaryConditions(object_name),
       d_mesh(mesh),
       d_fe_data_manager(fe_data_manager),
       d_sys_name(d_object_name),
-      d_scr_var(new CellVariable<NDIM, double>(d_object_name + "::SCR"))
+      d_scr_var(new CellVariable<NDIM, double>(d_object_name + "::SCR")),
+      d_use_old_soln(use_old_soln)
 {
     d_perturb_nodes = input_db->getBool("perturb_nodes");
     ExplicitSystem& fl_sys = d_fe_data_manager->getEquationSystems()->add_system<ExplicitSystem>(d_sys_name);
@@ -47,7 +50,9 @@ SBBoundaryConditions::SBBoundaryConditions(const std::string& object_name,
                  t_allocateOperatorState =
                      TimerManager::getManager()->getTimer("LS::SBBoundaryConditions::allocateOperatorState()");
                  t_deallocateOperatorState =
-                     TimerManager::getManager()->getTimer("LS::SBBoundaryConditions::deallocateOperatorState()"););
+                     TimerManager::getManager()->getTimer("LS::SBBoundaryConditions::deallocateOperatorState()");
+                 t_cache_boundary_data =
+                     TimerManager::getManager()->getTimer("LS::SBBoundaryConditions::cacheBoundaryData()"););
 }
 
 void
@@ -82,6 +87,7 @@ SBBoundaryConditions::allocateOperatorState(Pointer<PatchHierarchy<NDIM>> hierar
 {
     LS_TIMER_START(t_allocateOperatorState);
     LSCutCellBoundaryConditions::allocateOperatorState(hierarchy, time);
+    d_hierarchy = hierarchy;
 
     TBOX_ASSERT(d_ctx);
 
@@ -95,6 +101,9 @@ SBBoundaryConditions::allocateOperatorState(Pointer<PatchHierarchy<NDIM>> hierar
     d_rbf_reconstruct.setLSData(d_ls_idx, d_vol_idx);
     d_rbf_reconstruct.setPatchHierarchy(hierarchy);
     d_rbf_reconstruct.setUseCentroids(false);
+
+    cacheBoundaryData();
+
     for (size_t l = 0; l < d_fl_names.size(); ++l)
     {
         const int fl_idx = var_db->mapVariableAndContextToIndex(d_fl_vars[l], d_ctx);
@@ -115,6 +124,7 @@ SBBoundaryConditions::deallocateOperatorState(Pointer<PatchHierarchy<NDIM>> hier
         if (level->checkAllocated(d_scr_idx)) level->deallocatePatchData(d_scr_idx);
     }
     d_rbf_reconstruct.clearCache();
+    clearCache();
     LS_TIMER_STOP(t_deallocateOperatorState);
 }
 
@@ -126,6 +136,7 @@ SBBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>>
                                              Pointer<PatchHierarchy<NDIM>> hierarchy,
                                              const double time)
 {
+    if (!d_is_allocated) TBOX_ERROR(d_object_name + "::applyBoundaryCondition() must allocate operator first.\n\n");
     LS_TIMER_START(t_applyBoundaryCondition);
     TBOX_ASSERT(d_ls_var && d_vol_var && d_area_var);
     TBOX_ASSERT(d_ls_idx > 0 && d_vol_idx > 0 && d_area_idx > 0);
@@ -161,7 +172,10 @@ SBBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>>
     {
         auto& sf_sys = eq_sys->get_system<TransientExplicitSystem>(sf_name);
         sf_dof_maps.push_back(&sf_sys.get_dof_map());
-        sf_vecs.push_back(sf_sys.old_local_solution.get());
+        if (d_use_old_soln)
+            sf_vecs.push_back(sf_sys.old_local_solution.get());
+        else
+            sf_vecs.push_back(sf_sys.current_local_solution.get());
     }
 
     // Get base system
@@ -180,288 +194,60 @@ SBBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>>
     // Only changes are needed where the structure lives
     const int level_num = d_fe_data_manager->getFinestPatchLevelNumber();
     Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(level_num);
-    const Pointer<CartesianGridGeometry<NDIM>> grid_geom = level->getGridGeometry();
-    VectorValue<double> n;
-    IBTK::Point x_min, x_max;
-    const std::vector<std::vector<Elem*>>& active_patch_element_map = d_fe_data_manager->getActivePatchElementMap();
 
     for (PatchLevel<NDIM>::Iterator p(level); p; p++)
     {
-        Pointer<Patch<NDIM>> patch = level->getPatch(p());
-        const int patch_num = patch->getPatchNumber();
-        const std::vector<Elem*>& patch_elems = active_patch_element_map[patch_num];
-        const size_t num_active_patch_elems = patch_elems.size();
-        if (num_active_patch_elems == 0) continue;
-
-        Pointer<CellData<NDIM, double>> R_data = patch->getPatchData(R_idx);
-        Pointer<CellData<NDIM, double>> Q_data = patch->getPatchData(Q_idx);
-        Pointer<CellData<NDIM, double>> area_data = patch->getPatchData(d_area_idx);
-        Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(d_vol_idx);
-        Pointer<NodeData<NDIM, double>> ls_data = patch->getPatchData(d_ls_idx);
-
-        CellData<NDIM, double> elem_area_data(patch->getBox(), 1, 0);
-        elem_area_data.fillAll(0.0);
-
-        Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
-        const double* const x_lower = pgeom->getXLower();
-        const double* const dx = pgeom->getDx();
-        const hier::Index<NDIM>& patch_lower = patch->getBox().lower();
-
-        std::vector<dof_id_type> fl_dofs, sf_dofs, Q_dofs;
-        boost::multi_array<double, 2> x_node;
-        boost::multi_array<double, 1> Q_node;
-        std::vector<boost::multi_array<double, 1>> fl_node(d_fl_names.size()), sf_node(d_sf_names.size());
-        std::vector<double> sf_vals(d_sf_names.size()), fl_vals(d_fl_names.size());
-        for (const auto& elem : patch_elems)
+        for (const auto& elem_idx_pair : d_elem_idx_map_vec[level_num])
         {
-            const auto& X_dof_indices = X_dof_map_cache.dof_indices(elem);
-            IBTK::get_values_for_interpolation(x_node, *X_petsc_vec, X_local_soln, X_dof_indices);
+            const Pointer<Patch<NDIM>>& patch = level->getPatch(elem_idx_pair.first.d_patch_num);
+            const CellIndex<NDIM>& idx = elem_idx_pair.first.d_idx;
+            const std::vector<std::pair<Elem*, std::unique_ptr<Elem>>>& elem_pairs = elem_idx_pair.second;
+            const std::vector<std::vector<libMesh::Point>>& intersection_point_vec =
+                d_intersection_idx_map_vec[level_num][PatchIndexPair(patch, idx)];
 
-            // Simple check if element is completely within grid cell.
-            const unsigned int n_node = elem->n_nodes();
-            std::vector<hier::Index<NDIM>> elem_idx_nodes(n_node);
-            for (unsigned int k = 0; k < n_node; ++k)
+            Pointer<CellData<NDIM, double>> R_data = patch->getPatchData(R_idx);
+            Pointer<CellData<NDIM, double>> Q_data = patch->getPatchData(Q_idx);
+            Pointer<CellData<NDIM, double>> area_data = patch->getPatchData(d_area_idx);
+            Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(d_vol_idx);
+            Pointer<NodeData<NDIM, double>> ls_data = patch->getPatchData(d_ls_idx);
+
+            Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+            const double* const x_lower = pgeom->getXLower();
+            const double* const dx = pgeom->getDx();
+            const hier::Index<NDIM>& patch_lower = patch->getBox().lower();
+
+            for (unsigned int i = 0; i < elem_pairs.size(); ++i)
             {
-                const Node& node = elem->node_ref(k);
-                elem_idx_nodes[k] = IndexUtilities::getCellIndex(&node(0), grid_geom, level->getRatio());
-            }
-            // Check if all indices are the same
-            if (std::adjacent_find(elem_idx_nodes.begin(),
-                                   elem_idx_nodes.end(),
-                                   std::not_equal_to<hier::Index<NDIM>>()) == elem_idx_nodes.end())
-            {
-                Q_dof_map.dof_indices(elem, Q_dofs);
+                const Elem* const old_elem = elem_pairs[i].first;
+                const Elem* const new_elem = elem_pairs[i].second.get();
+                const std::vector<libMesh::Point>& intersection_points = intersection_point_vec[i];
+
+                std::vector<dof_id_type> fl_dofs, sf_dofs, Q_dofs;
+                boost::multi_array<double, 2> x_node;
+                boost::multi_array<double, 1> Q_node;
+                std::vector<boost::multi_array<double, 1>> fl_node(d_fl_names.size()), sf_node(d_sf_names.size());
+                std::vector<double> sf_vals(d_sf_names.size()), fl_vals(d_fl_names.size());
+
+                const auto& X_dof_indices = X_dof_map_cache.dof_indices(old_elem);
+                IBTK::get_values_for_interpolation(x_node, *X_petsc_vec, X_local_soln, X_dof_indices);
+
+                Q_dof_map.dof_indices(old_elem, Q_dofs);
                 IBTK::get_values_for_interpolation(Q_node, *Q_vec, Q_dofs);
                 for (unsigned int l = 0; l < d_fl_names.size(); ++l)
                 {
-                    fl_dof_maps[l]->dof_indices(elem, fl_dofs);
+                    fl_dof_maps[l]->dof_indices(old_elem, fl_dofs);
                     IBTK::get_values_for_interpolation(fl_node[l], *fl_vecs[l], fl_dofs);
                 }
                 for (unsigned int l = 0; l < d_sf_names.size(); ++l)
                 {
-                    sf_dof_maps[l]->dof_indices(elem, sf_dofs);
-                    IBTK::get_values_for_interpolation(sf_node[l], *sf_vecs[l], sf_dofs);
-                }
-                // Add contribution to g
-                double a = 0.0, g = 0.0;
-                fe->reinit(elem);
-                for (unsigned int qp = 0; qp < JxW.size(); ++qp)
-                {
-                    double Q_val = 0.0;
-                    std::fill(sf_vals.begin(), sf_vals.end(), 0.0);
-                    std::fill(fl_vals.begin(), fl_vals.end(), 0.0);
-                    for (int n = 0; n < 2; ++n)
-                    {
-                        Q_val += Q_node[n] * phi[n][qp];
-                        for (unsigned int l = 0; l < d_fl_names.size(); ++l) fl_vals[l] += fl_node[l][n] * phi[n][qp];
-                        for (unsigned int l = 0; l < d_sf_names.size(); ++l) sf_vals[l] += sf_node[l][n] * phi[n][qp];
-                    }
-                    a += d_a_fcn(Q_val, fl_vals, sf_vals, time, d_fcn_ctx) * JxW[qp];
-                    if (!d_homogeneous_bdry) g += d_g_fcn(Q_val, fl_vals, sf_vals, time, d_fcn_ctx) * JxW[qp];
-                }
-
-                double cell_volume = dx[0] * dx[1] * (*vol_data)(elem_idx_nodes[0]);
-                if (cell_volume <= 0.0)
-                {
-                    plog << "Found intersection with zero cell volume.\n";
-                    plog << "On index: " << elem_idx_nodes[0] << "with intersection points:\n";
-                    plog << "P0: " << elem->node_ref(0) << " and P1: " << elem->node_ref(1) << "\n";
-                    plog << "Ignoring contribution.\n";
-                    continue;
-                }
-                if (!d_homogeneous_bdry) (*R_data)(elem_idx_nodes[0]) += pre_fac * g / cell_volume;
-                (*R_data)(elem_idx_nodes[0]) -= pre_fac * a / cell_volume;
-                continue;
-            }
-
-            std::vector<libMesh::Point> X_node_cache(n_node), x_node_cache(n_node);
-            x_min = IBTK::Point::Constant(std::numeric_limits<double>::max());
-            x_max = IBTK::Point::Constant(-std::numeric_limits<double>::max());
-            for (unsigned int k = 0; k < n_node; ++k)
-            {
-                X_node_cache[k] = elem->point(k);
-                libMesh::Point& x = x_node_cache[k];
-                for (unsigned int d = 0; d < NDIM; ++d) x(d) = x_node[k][d];
-                // Perturb the mesh so that we keep FE nodes away from cell edges / nodes
-                // Therefore we don't have to worry about nodes being on a cell edge
-                if (d_perturb_nodes)
-                {
-                    for (unsigned int d = 0; d < NDIM; ++d)
-                    {
-                        const int i_s = std::floor((x(d) - x_lower[d]) / dx[d]) + patch_lower[d];
-                        for (int shift = 0; shift <= 2; ++shift)
-                        {
-                            const double x_s =
-                                x_lower[d] + dx[d] * (static_cast<double>(i_s - patch_lower[d]) + 0.5 * shift);
-                            const double tol = 1.0e-8 * dx[d];
-                            if (x(d) <= x_s) x(d) = std::min(x_s - tol, x(d));
-                            if (x(d) >= x_s) x(d) = std::max(x_s + tol, x(d));
-                        }
-                    }
-                }
-
-                for (unsigned int d = 0; d < NDIM; ++d)
-                {
-                    x_min[d] = std::min(x_min[d], x(d));
-                    x_max[d] = std::max(x_max[d], x(d));
-                }
-                elem->point(k) = x;
-            }
-            Box<NDIM> box(IndexUtilities::getCellIndex(&x_min[0], grid_geom, level->getRatio()),
-                          IndexUtilities::getCellIndex(&x_max[0], grid_geom, level->getRatio()));
-            box.grow(1);
-            box = box * patch->getBox();
-
-            // We have the bounding box of the element. Now loop over coordinate directions and look for intersections
-            // with the background grid.
-            for (BoxIterator<NDIM> b(box); b; b++)
-            {
-                const hier::Index<NDIM>& i_c = b();
-                // We have the index of the box. Each box should have zero or two intersections
-                std::vector<libMesh::Point> intersection_points(0);
-                for (int upper_lower = 0; upper_lower < 2; ++upper_lower)
-                {
-                    for (int axis = 0; axis < NDIM; ++axis)
-                    {
-                        VectorValue<double> q;
-#if (NDIM == 2)
-                        q((axis + 1) % NDIM) = dx[(axis + 1) % NDIM];
-#endif
-                        libMesh::Point r;
-                        for (int d = 0; d < NDIM; ++d)
-                            r(d) = x_lower[d] + dx[d] * (static_cast<double>(i_c(d) - patch_lower[d]) +
-                                                         (d == axis ? (upper_lower == 1 ? 1.0 : 0.0) : 0.5));
-
-                        libMesh::Point p;
-                        // An element may intersect zero or one times with a cell edge.
-                        if (findIntersection(p, elem, r, q)) intersection_points.push_back(p);
-                    }
-                }
-
-                // An element may have zero, one, or two intersections with a cell.
-                // Note we've already accounted for when an element is contained within a cell.
-                if (intersection_points.size() == 0) continue;
-                TBOX_ASSERT(intersection_points.size() <= 2);
-#if (NDIM > 2)
-                // We've found an intersection point. We need to find distances from these intersections to the nodes
-                // Note that ElemCutter only works in > 1 spatial dimensions, so we only use it for NDIM = 3
-                std::vector<double> node_dists(elem->n_nodes(), std::numeric_limits<double>::max());
-                plog << "On element: " << elem->id() << "\n";
-                for (unsigned int node_num = 0; node_num < elem->n_nodes(); ++node_num)
-                {
-                    const Node* node = elem->node_ptr(node_num);
-                    for (const auto& pt : intersection_points)
-                    {
-                        // Find distance to node
-                        double dist = (*node - pt).norm();
-                        // determine if distance is "positive" (outside of current cell) or "negative" (inside of
-                        // current cell)
-                        hier::Index<NDIM> node_idx =
-                            IndexUtilities::getCellIndex(&(*node)(0), grid_geom, level->getRatio());
-                        if (node_idx == i_c)
-                        {
-                            // distance is negative
-                            dist = -dist;
-                        }
-                        plog << "Found new distance: " << dist << "\n";
-                        node_dists[node_num] = std::min(node_dists[node_num], dist);
-                    }
-                }
-                // We have the signed distances, use ElemCutter to subdivide the element
-                libMesh::ElemCutter elem_cutter;
-                elem_cutter(*elem, node_dists);
-                const std::vector<const Elem*>& new_elems = elem_cutter.inside_elements();
-                plog << "On index: " << i_c << " we found: " << new_elems.size() << " new elements.\n";
-                plog << "Node distances: \n";
-                for (const auto& dist : node_dists) plog << dist << "\n";
-                // Now we need to loop over the new elements and interpolate the data onto the nodes
-                for (const auto& new_elem : new_elems)
-                {
-                    std::vector<libMesh::Point> nodes;
-                    unsigned int num_nodes = new_elem->n_nodes();
-                    for (unsigned int node_num = 0; node_num < num_nodes; ++node_num)
-                        nodes.push_back(new_elem->node_ref(node_num));
-                    fe->reinit(elem, &nodes);
-                    std::vector<double> new_node_vals(num_nodes);
-                    for (unsigned int node_num = 0; node_num < num_nodes; ++node_num)
-                    {
-                        new_node_vals[node_num] = IBTK::interpolate(node_num, q_st_node, phi);
-                    }
-                    // Now integrate solution on new_elem.
-                    fe->reinit(new_elem);
-                    double g = 0.0, a = 0.0;
-                    for (unsigned int node_num = 0; node_num < num_nodes; ++node_num)
-                    {
-                        for (unsigned int qp = 0; qp < phi[node_num].size(); ++qp)
-                        {
-                            a += d_k_on * (d_cb_max - new_node_vals[node_num] * phi[node_num][qp]) * JxW[qp];
-                            g -= d_k_off * new_node_vals[node_num] * phi[node_num][qp] * JxW[qp];
-                        }
-                    }
-                    double area = (*area_data)(i_c);
-                    double cell_volume = dx[0] * dx[1] * (*vol_data)(i_c);
-                    if (cell_volume <= 0.0)
-                    {
-                        plog << "Found intersection with zero cell volume.\n";
-                        plog << "On index: " << i_c << " with intersection points:\n";
-                        plog << "P0: " << intersection_points[0] << " and P1: " << intersection_points[1] << "\n";
-                        continue;
-                    }
-                    plog << "For index: " << i_c << "\n";
-                    plog << "a value: " << a << "\n";
-                    plog << "g value: " << g << "\n";
-                    (*R_data)(i_c) += pre_fac * g * area / cell_volume;
-                    (*R_data)(i_c) -= pre_fac * a * (*Q_data)(i_c)*area / cell_volume;
-                }
-#else
-                // Create a new element
-                std::unique_ptr<Elem> new_elem = Elem::build(EDGE2);
-                if (intersection_points.size() == 1)
-                {
-                    for (unsigned int k = 0; k < n_node; ++k)
-                    {
-                        libMesh::Point xn;
-                        for (int d = 0; d < NDIM; ++d) xn(d) = elem->point(k)(d);
-                        const hier::Index<NDIM>& n_idx =
-                            IndexUtilities::getCellIndex(&xn(0), grid_geom, level->getRatio());
-                        if (n_idx == i_c)
-                        {
-                            // Check if we already have this point accounted for. Note this can happend when a node is
-                            // EXACTLY on a cell face or node.
-                            if (intersection_points[0] == xn) continue;
-                            intersection_points.push_back(xn);
-                            break;
-                        }
-                    }
-                }
-                // At this point, if we still only have one intersection point, our node is on a face, and we can skip
-                // this index.
-                if (intersection_points.size() == 1) continue;
-                TBOX_ASSERT(intersection_points.size() == 2);
-                std::array<std::unique_ptr<Node>, 2> new_nodes_for_elem;
-                for (int i = 0; i < 2; ++i)
-                {
-                    new_nodes_for_elem[i] = libmesh_make_unique<Node>(intersection_points[i], i);
-                    new_elem->set_id(0);
-                    new_elem->set_node(i) = new_nodes_for_elem[i].get();
-                }
-                Q_dof_map.dof_indices(elem, Q_dofs);
-                IBTK::get_values_for_interpolation(Q_node, *Q_vec, Q_dofs);
-                for (unsigned int l = 0; l < d_fl_names.size(); ++l)
-                {
-                    fl_dof_maps[l]->dof_indices(elem, fl_dofs);
-                    IBTK::get_values_for_interpolation(fl_node[l], *fl_vecs[l], fl_dofs);
-                }
-                for (unsigned int l = 0; l < d_sf_names.size(); ++l)
-                {
-                    sf_dof_maps[l]->dof_indices(elem, sf_dofs);
+                    sf_dof_maps[l]->dof_indices(old_elem, sf_dofs);
                     IBTK::get_values_for_interpolation(sf_node[l], *sf_vecs[l], sf_dofs);
                 }
                 // We need to interpolate our solution to the new element's nodes
                 std::array<double, 2> Q_soln_on_new_elem;
                 std::vector<std::array<double, 2>> sf_soln_on_new_elem(d_sf_names.size()),
                     fl_soln_on_new_elem(d_fl_names.size());
-                fe->reinit(elem, &intersection_points);
+                fe->reinit(old_elem, &intersection_points);
                 for (unsigned int l = 0; l < 2; ++l)
                 {
                     Q_soln_on_new_elem[l] = IBTK::interpolate(l, Q_node, phi);
@@ -471,7 +257,7 @@ SBBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>>
                         fl_soln_on_new_elem[k][l] = IBTK::interpolate(l, fl_node[k], phi);
                 }
                 // Then we need to integrate
-                fe->reinit(new_elem.get());
+                fe->reinit(new_elem);
                 double a = 0.0, g = 0.0;
                 double area = 0.0;
                 for (unsigned int qp = 0; qp < JxW.size(); ++qp)
@@ -491,38 +277,17 @@ SBBoundaryConditions::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>>
                     area += JxW[qp];
                     if (!d_homogeneous_bdry) g += d_g_fcn(Q_val, fl_vals, sf_vals, time, d_fcn_ctx) * JxW[qp];
                 }
-                elem_area_data(i_c) += area;
 
-                NodeIndex<NDIM> idx_neg;
-                bool done = false;
-                for (int x = 0; x < 2 && !done; ++x)
-                {
-                    for (int y = 0; y < 2 && !done; ++y)
-                    {
-                        idx_neg = NodeIndex<NDIM>(i_c, IntVector<NDIM>(x, y));
-                        double ls_val = (*ls_data)(idx_neg);
-                        if (ls_val < 0.0) done = true;
-                    }
-                }
-
-                double cell_volume = dx[0] * dx[1] * (*vol_data)(i_c);
+                double cell_volume = dx[0] * dx[1] * (*vol_data)(idx);
                 if (cell_volume <= 0.0)
                 {
                     plog << "Found intersection with zero cell volume.\n";
-                    plog << "On index: " << i_c << "with intersection points:\n";
-                    plog << "P0: " << intersection_points[0] << " and P1: " << intersection_points[1] << "\n";
+                    plog << "On index: " << idx << "\n";
                     plog << "Ignoring contribution.\n";
                     continue;
                 }
-                if (!d_homogeneous_bdry) (*R_data)(i_c) += pre_fac * g / cell_volume;
-                (*R_data)(i_c) -= pre_fac * a / cell_volume;
-#endif
-            }
-
-            // Restore the element coordinates.
-            for (unsigned int k = 0; k < n_node; ++k)
-            {
-                elem->point(k) = X_node_cache[k];
+                if (!d_homogeneous_bdry) (*R_data)(idx) += pre_fac * g / cell_volume;
+                (*R_data)(idx) -= pre_fac * a / cell_volume;
             }
         }
     }
@@ -564,6 +329,7 @@ SBBoundaryConditions::interpolateToBoundary(const int Q_idx,
 
     // Loop over patches and interpolate solution to the boundary
     // Assume we are only doing this on the finest level
+    // TODO: This stuff only changes in between timesteps. We should cache this information.
     Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(hierarchy->getFinestLevelNumber());
     const std::vector<std::vector<Node*>>& active_patch_node_map = d_fe_data_manager->getActivePatchNodeMap();
     for (PatchLevel<NDIM>::Iterator p(level); p; p++)
@@ -688,5 +454,211 @@ SBBoundaryConditions::findIntersection(libMesh::Point& p, Elem* elem, libMesh::P
         TBOX_ERROR("Unknown element.\n");
     }
     return found_intersection;
+}
+
+void
+SBBoundaryConditions::clearCache()
+{
+    for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
+    {
+        d_node_idx_map_vec[ln].clear();
+        d_elem_idx_map_vec[ln].clear();
+        d_intersection_idx_map_vec[ln].clear();
+    }
+}
+
+void
+SBBoundaryConditions::cacheBoundaryData()
+{
+    LS_TIMER_START(t_cache_boundary_data);
+    d_node_idx_map_vec.resize(d_hierarchy->getFinestLevelNumber() + 1);
+    d_elem_idx_map_vec.resize(d_hierarchy->getFinestLevelNumber() + 1);
+    d_intersection_idx_map_vec.resize(d_hierarchy->getFinestLevelNumber() + 1);
+    EquationSystems* eq_sys = d_fe_data_manager->getEquationSystems();
+
+    System& X_system = eq_sys->get_system(d_fe_data_manager->COORDINATES_SYSTEM_NAME);
+    DofMap& X_dof_map = X_system.get_dof_map();
+    FEType X_fe_type = X_dof_map.variable_type(0);
+    NumericVector<double>* X_vec = X_system.solution.get();
+    auto X_petsc_vec = dynamic_cast<PetscVector<double>*>(X_vec);
+    TBOX_ASSERT(X_petsc_vec != nullptr);
+    const double* const X_local_soln = X_petsc_vec->get_array_read();
+    FEDataManager::SystemDofMapCache& X_dof_map_cache =
+        *d_fe_data_manager->getDofMapCache(d_fe_data_manager->COORDINATES_SYSTEM_NAME);
+
+    // Only changes are needed where the structure lives
+    const int level_num = d_fe_data_manager->getFinestPatchLevelNumber();
+    Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
+    const Pointer<CartesianGridGeometry<NDIM>> grid_geom = level->getGridGeometry();
+    VectorValue<double> n;
+    IBTK::Point x_min, x_max;
+    const std::vector<std::vector<Elem*>>& active_patch_element_map = d_fe_data_manager->getActivePatchElementMap();
+
+    for (PatchLevel<NDIM>::Iterator p(level); p; p++)
+    {
+        Pointer<Patch<NDIM>> patch = level->getPatch(p());
+        const int patch_num = patch->getPatchNumber();
+        const std::vector<Elem*>& patch_elems = active_patch_element_map[patch_num];
+        const size_t num_active_patch_elems = patch_elems.size();
+        if (num_active_patch_elems == 0) continue;
+
+        Pointer<CellData<NDIM, double>> area_data = patch->getPatchData(d_area_idx);
+        Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(d_vol_idx);
+        Pointer<NodeData<NDIM, double>> ls_data = patch->getPatchData(d_ls_idx);
+
+        Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
+        const double* const x_lower = pgeom->getXLower();
+        const double* const dx = pgeom->getDx();
+        const hier::Index<NDIM>& patch_lower = patch->getBox().lower();
+
+        std::vector<dof_id_type> fl_dofs, sf_dofs, Q_dofs;
+        boost::multi_array<double, 2> x_node;
+        boost::multi_array<double, 1> Q_node;
+        std::vector<boost::multi_array<double, 1>> fl_node(d_fl_names.size()), sf_node(d_sf_names.size());
+        std::vector<double> sf_vals(d_sf_names.size()), fl_vals(d_fl_names.size());
+        for (const auto& elem : patch_elems)
+        {
+            const auto& X_dof_indices = X_dof_map_cache.dof_indices(elem);
+            IBTK::get_values_for_interpolation(x_node, *X_petsc_vec, X_local_soln, X_dof_indices);
+
+            // Simple check if element is completely within grid cell.
+            const unsigned int n_node = elem->n_nodes();
+            std::vector<hier::Index<NDIM>> elem_idx_nodes(n_node);
+            for (unsigned int k = 0; k < n_node; ++k)
+            {
+                const Node& node = elem->node_ref(k);
+                elem_idx_nodes[k] = IndexUtilities::getCellIndex(&node(0), grid_geom, level->getRatio());
+            }
+            // Check if all indices are the same
+            if (std::adjacent_find(elem_idx_nodes.begin(),
+                                   elem_idx_nodes.end(),
+                                   std::not_equal_to<hier::Index<NDIM>>()) == elem_idx_nodes.end())
+            {
+                // Element is entirely contained in cell.
+                // Store element and continue to next element
+                PatchIndexPair p_idx(patch, CellIndex<NDIM>(elem_idx_nodes[0]));
+                // Create copy of element
+                std::unique_ptr<Elem> new_elem = Elem::build(elem->type());
+                std::array<std::unique_ptr<Node>, 2> new_elem_nodes;
+                for (int n = 0; n < elem->n_nodes(); ++n)
+                {
+                    new_elem_nodes[n] = libmesh_make_unique<Node>(*elem->get_nodes()[n], n);
+                    new_elem->set_id(0);
+                    new_elem->set_node(n) = new_elem_nodes[n].get();
+                    d_node_idx_map_vec[level_num][p_idx].push_back(std::move(new_elem_nodes[n]));
+                }
+                d_elem_idx_map_vec[level_num][p_idx].push_back(std::make_pair(elem, std::move(new_elem)));
+                continue;
+            }
+
+            std::vector<libMesh::Point> X_node_cache(n_node), x_node_cache(n_node);
+            x_min = IBTK::Point::Constant(std::numeric_limits<double>::max());
+            x_max = IBTK::Point::Constant(-std::numeric_limits<double>::max());
+            for (unsigned int k = 0; k < n_node; ++k)
+            {
+                X_node_cache[k] = elem->point(k);
+                libMesh::Point& x = x_node_cache[k];
+                for (unsigned int d = 0; d < NDIM; ++d) x(d) = x_node[k][d];
+                // Perturb the mesh so that we keep FE nodes away from cell edges / nodes
+                // Therefore we don't have to worry about nodes being on a cell edge
+                if (d_perturb_nodes)
+                {
+                    for (unsigned int d = 0; d < NDIM; ++d)
+                    {
+                        const int i_s = std::floor((x(d) - x_lower[d]) / dx[d]) + patch_lower[d];
+                        for (int shift = 0; shift <= 2; ++shift)
+                        {
+                            const double x_s =
+                                x_lower[d] + dx[d] * (static_cast<double>(i_s - patch_lower[d]) + 0.5 * shift);
+                            const double tol = 1.0e-8 * dx[d];
+                            if (x(d) <= x_s) x(d) = std::min(x_s - tol, x(d));
+                            if (x(d) >= x_s) x(d) = std::max(x_s + tol, x(d));
+                        }
+                    }
+                }
+
+                for (unsigned int d = 0; d < NDIM; ++d)
+                {
+                    x_min[d] = std::min(x_min[d], x(d));
+                    x_max[d] = std::max(x_max[d], x(d));
+                }
+                elem->point(k) = x;
+            }
+            Box<NDIM> box(IndexUtilities::getCellIndex(&x_min[0], grid_geom, level->getRatio()),
+                          IndexUtilities::getCellIndex(&x_max[0], grid_geom, level->getRatio()));
+            box.grow(1);
+            box = box * patch->getBox();
+
+            // We have the bounding box of the element. Now loop over coordinate directions and look for intersections
+            // with the background grid.
+            for (BoxIterator<NDIM> b(box); b; b++)
+            {
+                const hier::Index<NDIM>& i_c = b();
+                // We have the index of the box. Each box should have zero or two intersections
+                std::vector<libMesh::Point> intersection_points(0);
+                for (int upper_lower = 0; upper_lower < 2; ++upper_lower)
+                {
+                    for (int axis = 0; axis < NDIM; ++axis)
+                    {
+                        VectorValue<double> q;
+#if (NDIM == 2)
+                        q((axis + 1) % NDIM) = dx[(axis + 1) % NDIM];
+#endif
+                        libMesh::Point r;
+                        for (int d = 0; d < NDIM; ++d)
+                            r(d) = x_lower[d] + dx[d] * (static_cast<double>(i_c(d) - patch_lower[d]) +
+                                                         (d == axis ? (upper_lower == 1 ? 1.0 : 0.0) : 0.5));
+
+                        libMesh::Point p;
+                        // An element may intersect zero or one times with a cell edge.
+                        if (findIntersection(p, elem, r, q)) intersection_points.push_back(p);
+                    }
+                }
+
+                // An element may have zero, one, or two intersections with a cell.
+                // Note we've already accounted for when an element is contained within a cell.
+                if (intersection_points.size() == 0) continue;
+                TBOX_ASSERT(intersection_points.size() <= 2);
+
+                // Create a new element
+                std::unique_ptr<Elem> new_elem = Elem::build(EDGE2);
+                if (intersection_points.size() == 1)
+                {
+                    for (unsigned int k = 0; k < n_node; ++k)
+                    {
+                        libMesh::Point xn;
+                        for (int d = 0; d < NDIM; ++d) xn(d) = elem->point(k)(d);
+                        const hier::Index<NDIM>& n_idx =
+                            IndexUtilities::getCellIndex(&xn(0), grid_geom, level->getRatio());
+                        if (n_idx == i_c)
+                        {
+                            // Check if we already have this point accounted for. Note this can happen when a node is
+                            // EXACTLY on a cell face or node.
+                            if (intersection_points[0] == xn) continue;
+                            intersection_points.push_back(xn);
+                            break;
+                        }
+                    }
+                }
+                // At this point, if we still only have one intersection point, our node is on a face, and we can skip
+                // this index.
+                if (intersection_points.size() == 1) continue;
+                TBOX_ASSERT(intersection_points.size() == 2);
+                PatchIndexPair p_idx(patch, CellIndex<NDIM>(i_c));
+                int cur_end = d_node_idx_map_vec[level_num][p_idx].size();
+                for (int i = 0; i < 2; ++i)
+                {
+                    d_node_idx_map_vec[level_num][p_idx].push_back(
+                        libmesh_make_unique<Node>(intersection_points[i], i));
+                    new_elem->set_id(0);
+                    new_elem->set_node(i) = d_node_idx_map_vec[level_num][p_idx][i + cur_end].get();
+                }
+                // We have new element. Add it to the list.
+                d_intersection_idx_map_vec[level_num][p_idx].push_back(std::move(intersection_points));
+                d_elem_idx_map_vec[level_num][p_idx].push_back(std::make_pair(elem, std::move(new_elem)));
+            }
+        }
+    }
+    LS_TIMER_STOP(t_cache_boundary_data);
 }
 } // namespace LS

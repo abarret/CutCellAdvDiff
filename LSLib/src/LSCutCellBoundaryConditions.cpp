@@ -10,12 +10,15 @@ LSCutCellBoundaryConditions::LSCutCellBoundaryConditions(const std::string& obje
 void
 LSCutCellBoundaryConditions::allocateOperatorState(Pointer<PatchHierarchy<NDIM>> /*hierarchy*/, double /*time*/)
 {
-    // intentionally blank
+    if (d_is_allocated) return;
+    d_is_allocated = true;
 }
 
 void
 LSCutCellBoundaryConditions::deallocateOperatorState(Pointer<PatchHierarchy<NDIM>> /*hierarchy*/, double /*time*/)
 {
+    if (!d_is_allocated) return;
+    d_is_allocated = false;
     // intentionally blank
 }
 

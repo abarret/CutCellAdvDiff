@@ -1,6 +1,7 @@
 #ifndef included_SBBoundaryConditions
 #define included_SBBoundaryConditions
 
+#include "ibtk/FECache.h"
 #include "ibtk/FEDataManager.h"
 
 #include "LS/LSCutCellBoundaryConditions.h"
@@ -20,7 +21,8 @@ public:
     SBBoundaryConditions(const std::string& object_name,
                          SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
                          libMesh::Mesh* mesh,
-                         IBTK::FEDataManager* fe_manager);
+                         IBTK::FEDataManager* fe_manager,
+                         bool use_old_soln = true);
 
     ~SBBoundaryConditions() = default;
 
@@ -75,6 +77,17 @@ private:
      */
     bool findIntersection(libMesh::Point& p, libMesh::Elem* elem, libMesh::Point r, libMesh::VectorValue<double> q);
 
+    void clearCache();
+
+    void cacheBoundaryData();
+
+    SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
+
+    std::vector<std::map<LS::PatchIndexPair, std::vector<std::unique_ptr<libMesh::Node>>>> d_node_idx_map_vec;
+    std::vector<std::map<LS::PatchIndexPair, std::vector<std::pair<libMesh::Elem*, std::unique_ptr<libMesh::Elem>>>>>
+        d_elem_idx_map_vec;
+    std::vector<std::map<LS::PatchIndexPair, std::vector<std::vector<libMesh::Point>>>> d_intersection_idx_map_vec;
+
     double d_D_coef = std::numeric_limits<double>::quiet_NaN();
 
     libMesh::Mesh* d_mesh = nullptr;
@@ -88,6 +101,7 @@ private:
     void* d_fcn_ctx = nullptr;
 
     bool d_perturb_nodes = true;
+    bool d_use_old_soln = true;
 
     RBFReconstructCache d_rbf_reconstruct;
 

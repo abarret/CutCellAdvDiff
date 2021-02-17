@@ -89,6 +89,8 @@ protected:
 
     double d_D = std::numeric_limits<double>::quiet_NaN();
 
+    bool d_is_allocated = false;
+
     DiffusionTimeIntegrationMethod d_ts_type = DiffusionTimeIntegrationMethod::UNKNOWN_METHOD;
 };
 
