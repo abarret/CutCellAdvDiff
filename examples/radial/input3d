@@ -1,17 +1,17 @@
 // physical parameters
 PI = 3.14159265359
-L = 12.0
+L = 3.0
 BASE_NAME = "test1"
 
 // grid spacing parameters
-MAX_LEVELS = 3                            // maximum number of levels in locally refined grid
+MAX_LEVELS = 1                            // maximum number of levels in locally refined grid
 REF_RATIO  = 4                            // refinement ratio between levels
-N = 8                                    // coarsest grid spacing
+N = 36*2                                    // coarsest grid spacing
 NFINEST = (REF_RATIO^(MAX_LEVELS - 1))*N  // finest   grid spacing
 H = L/NFINEST
-CFL_MAX = 0.3
+CFL_MAX = 0.5
 DT_MAX = H * CFL_MAX / 1
-END_TIME = 10 * DT_MAX
+END_TIME = 2.0
 REGRID_INTERVAL = 1
 
 OUTPUT_BDRY_INFO = TRUE
@@ -25,6 +25,7 @@ ADVECTION_TS_TYPE = "MIDPOINT_RULE"
 DIFFUSION_TS_TYPE = "TRAPEZOIDAL_RULE"
 USE_RBFS = TRUE
 RBF_STENCIL_SIZE = 2
+RBF_POLY_ORDER = "QUADRATIC"
 
 USING_CIRCLE = TRUE
 STATIONARY_INTERFACE = FALSE
@@ -130,7 +131,7 @@ Main {
 
 // visualization dump parameters
    viz_writer                  = "VisIt"
-   viz_dump_interval           = 10//NFINEST/8
+   viz_dump_interval           = NFINEST/8
    viz_dump_dirname            = "viz_adv_diff3d"
    visit_number_procs_per_file = 1
 
@@ -201,7 +202,8 @@ AdvDiffSemiImplicitHierarchyIntegrator {
     advection_ts_type = ADVECTION_TS_TYPE
     diffusion_ts_type = DIFFUSION_TS_TYPE
     use_rbfs = USE_RBFS
-  rbf_stencil_size = RBF_STENCIL_SIZE
+    rbf_stencil_size = RBF_STENCIL_SIZE
+    rbf_poly_order = RBF_POLY_ORDER
  
     convective_op_type                 = "PPM"//WAVE_PROP"
     convective_difference_form         = "CONSERVATIVE"

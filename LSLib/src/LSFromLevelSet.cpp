@@ -75,7 +75,12 @@ LSFromLevelSet::updateVolumeAreaSideLS(int vol_idx,
             Pointer<CartesianPatchGeometry<NDIM>> pgeom = patch->getPatchGeometry();
             const double* const dx = pgeom->getDx();
             const double* const xlow = pgeom->getXLower();
+#if (NDIM == 2)
             const double cell_volume = dx[0] * dx[1];
+#endif
+#if (NDIM == 3)
+            const double cell_volume = dx[0] * dx[1] * dx[2];
+#endif
             for (CellIterator<NDIM> ci(box); ci; ci++)
             {
                 const CellIndex<NDIM>& idx = ci();
@@ -102,6 +107,13 @@ LSFromLevelSet::updateVolumeAreaSideLS(int vol_idx,
                                                    (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(f, 0))),
                                                    (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(f, 1))));
 #endif
+#if (NDIM == 3)
+                        double L = area_fraction(1.0,
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(f, 0, 0))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(f, 1, 0))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(f, 1, 1))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(f, 0, 1))));
+#endif
                         (*side_data)(SideIndex<NDIM>(idx, 0, f)) = L;
                     }
                     for (int f = 0; f < 2; ++f)
@@ -111,8 +123,26 @@ LSFromLevelSet::updateVolumeAreaSideLS(int vol_idx,
                                                    (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(0, f))),
                                                    (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(1, f))));
 #endif
+#if (NDIM == 3)
+                        double L = area_fraction(1.0,
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(0, f, 0))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(1, f, 0))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(1, f, 1))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(0, f, 1))));
+#endif
                         (*side_data)(SideIndex<NDIM>(idx, 1, f)) = L;
                     }
+#if (NDIM == 3)
+                    for (int f = 0; f < 2; ++f)
+                    {
+                        double L = area_fraction(1.0,
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(0, 0, f))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(1, 0, f))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(1, 1, f))),
+                                                 (*phi_data)(NodeIndex<NDIM>(idx, IntVector<NDIM>(0, 1, f))));
+                        (*side_data)(SideIndex<NDIM>(idx, 2, f)) = L;
+                    }
+#endif
                 }
             }
         }

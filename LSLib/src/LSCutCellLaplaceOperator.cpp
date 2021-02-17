@@ -324,12 +324,12 @@ LSCutCellLaplaceOperator::computeHelmholtzAction(const CellData<NDIM, double>& Q
     {
         const CellIndex<NDIM>& idx = ci();
         double cell_volume = (*vol_data)(idx);
-        for (int d = 0; d < NDIM; ++d) cell_volume *= dx[d];
         if (MathUtilities<double>::equalEps(cell_volume, 0.0))
         {
             for (unsigned int l = 0; l < d_bc_coefs.size(); ++l) R_data(idx, l) = 0.0;
             continue;
         }
+        for (int d = 0; d < NDIM; ++d) cell_volume *= dx[d];
         double Q_avg = (Q_data)(idx);
         for (unsigned int l = 0; l < d_bc_coefs.size(); ++l)
         {
@@ -340,7 +340,12 @@ LSCutCellLaplaceOperator::computeHelmholtzAction(const CellData<NDIM, double>& Q
             for (int f = 0; f < 2; ++f)
             {
                 const int sgn = f == 0 ? -1 : 1;
+#if (NDIM == 2)
                 const double L = dx[1] * (*side_data)(SideIndex<NDIM>(idx, 0, f));
+#endif
+#if (NDIM == 3)
+                const double L = dx[1] * dx[2] * (*side_data)(SideIndex<NDIM>(idx, 0, f));
+#endif
                 double Q_next = Q_data(idx + xp * sgn);
                 double vol_next = (*vol_data)(idx + xp * sgn);
                 if (MathUtilities<double>::equalEps(vol_next, 0.0)) continue;
@@ -351,7 +356,12 @@ LSCutCellLaplaceOperator::computeHelmholtzAction(const CellData<NDIM, double>& Q
             for (int f = 0; f < 2; ++f)
             {
                 const int sgn = f == 0 ? -1 : 1;
+#if (NDIM == 2)
                 const double L = dx[0] * (*side_data)(SideIndex<NDIM>(idx, 1, f));
+#endif
+#if (NDIM == 3)
+                const double L = dx[0] * dx[2] * (*side_data)(SideIndex<NDIM>(idx, 1, f));
+#endif
                 double Q_next = Q_data(idx + yp * sgn);
                 double vol_next = (*vol_data)(idx + yp * sgn);
                 if (MathUtilities<double>::equalEps(vol_next, 0.0)) continue;
@@ -363,7 +373,7 @@ LSCutCellLaplaceOperator::computeHelmholtzAction(const CellData<NDIM, double>& Q
             {
                 const int sgn = f == 0 ? -1 : 1;
                 // Note the awkward ordering of indices. Needs to start at "bottom left" index and go clockwise
-                const double L = (*side_data)(SideIndex<NDIM>(idx, 2, f));
+                const double L = dx[0] * dx[1] * (*side_data)(SideIndex<NDIM>(idx, 2, f));
                 double Q_next = Q_data(idx + zp * sgn);
                 double vol_next = (*vol_data)(idx + zp * sgn);
                 if (MathUtilities<double>::equalEps(vol_next, 0.0)) continue;

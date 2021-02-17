@@ -164,6 +164,7 @@ static Timer* t_integrate_path_ls;
 static Timer* t_least_squares;
 static Timer* t_rbf_reconstruct;
 static Timer* t_find_cell_centroid;
+static Timer* t_extrapolate_diff_step;
 
 } // namespace
 int SemiLagrangianAdvIntegrator::GHOST_CELL_WIDTH = 4;
@@ -219,7 +220,9 @@ SemiLagrangianAdvIntegrator::SemiLagrangianAdvIntegrator(const std::string& obje
         t_rbf_reconstruct =
             TimerManager::getManager()->getTimer("LS::SemiLagrangianAdvIntegrator::radial_basis_reconstruction");
         t_find_cell_centroid =
-            TimerManager::getManager()->getTimer("LS::SemiLagrangianAdvIntegrator::find_cell_centroid"));
+            TimerManager::getManager()->getTimer("LS::SemiLagrangianAdvIntegrator::find_cell_centroid");
+        t_extrapolate_diff_step =
+            TimerManager::getManager()->getTimer("LS::SemiLagrangianAdvIntegrator::reconstructStep"););
 }
 
 void
@@ -1001,6 +1004,7 @@ SemiLagrangianAdvIntegrator::initializeCompositeHierarchyDataSpecialized(const d
             d_reconstruction_cache = new RBFReconstructCache();
         else
             d_reconstruction_cache = new MLSReconstructCache();
+        d_reconstruction_cache->setStencilWidth(1);
     }
 }
 
@@ -1242,6 +1246,7 @@ SemiLagrangianAdvIntegrator::diffusionUpdate(Pointer<CellVariable<NDIM, double>>
         hier_ghost_cell.initializeOperatorState(ghost_cell_comps, d_hierarchy);
         hier_ghost_cell.fillData(current_time);
     }
+    LS_TIMER_START(t_extrapolate_diff_step);
     d_reconstruction_cache->setPatchHierarchy(d_hierarchy);
     d_reconstruction_cache->setLSData(ls_idx, vol_idx);
     d_reconstruction_cache->setUseCentroids(true);
@@ -1273,6 +1278,7 @@ SemiLagrangianAdvIntegrator::diffusionUpdate(Pointer<CellVariable<NDIM, double>>
             }
         }
     }
+    LS_TIMER_STOP(t_extrapolate_diff_step);
 
     Pointer<LSCutCellLaplaceOperator> rhs_oper = d_helmholtz_rhs_ops[l];
 #if !defined(NDEBUG)
@@ -1333,6 +1339,7 @@ SemiLagrangianAdvIntegrator::diffusionUpdate(Pointer<CellVariable<NDIM, double>>
         hier_ghost_cell.initializeOperatorState(ghost_cell_comps, d_hierarchy);
         hier_ghost_cell.fillData(current_time);
     }
+    LS_TIMER_START(t_extrapolate_diff_step);
     d_reconstruction_cache->clearCache();
     d_reconstruction_cache->setUseCentroids(false);
     for (int ln = 0; ln <= d_hierarchy->getFinestLevelNumber(); ++ln)
@@ -1364,6 +1371,7 @@ SemiLagrangianAdvIntegrator::diffusionUpdate(Pointer<CellVariable<NDIM, double>>
             }
         }
     }
+    LS_TIMER_STOP(t_extrapolate_diff_step);
     if (d_enable_logging)
     {
         plog << d_object_name << "::integrateHierarchy(): diffusion solve number of iterations = "

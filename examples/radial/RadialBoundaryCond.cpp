@@ -73,6 +73,7 @@ RadialBoundaryCond::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>> Q
                 if (area > 0.0)
                 {
                     TBOX_ASSERT(cell_volume > 0.0);
+#if (NDIM == 2)
                     NodeIndex<NDIM> idx_ll(idx, NodeIndex<NDIM>::LowerLeft);
                     NodeIndex<NDIM> idx_lr(idx, NodeIndex<NDIM>::LowerRight);
                     NodeIndex<NDIM> idx_ul(idx, NodeIndex<NDIM>::UpperLeft);
@@ -84,6 +85,31 @@ RadialBoundaryCond::applyBoundaryCondition(Pointer<CellVariable<NDIM, double>> Q
                         ((*ls_data)(idx_ul) + (*ls_data)(idx_ur) - (*ls_data)(idx_ll) - (*ls_data)(idx_lr)) /
                         (2.0 * dx[1]);
                     double dist = LS::node_to_cell(idx, *ls_data) / std::sqrt(dphi_dx * dphi_dx + dphi_dy * dphi_dy);
+#endif
+#if (NDIM == 3)
+                    NodeIndex<NDIM> idx_lll(idx, NodeIndex<NDIM>::LLL);
+                    NodeIndex<NDIM> idx_llu(idx, NodeIndex<NDIM>::LLU);
+                    NodeIndex<NDIM> idx_lul(idx, NodeIndex<NDIM>::LUL);
+                    NodeIndex<NDIM> idx_luu(idx, NodeIndex<NDIM>::LUU);
+                    NodeIndex<NDIM> idx_ull(idx, NodeIndex<NDIM>::ULL);
+                    NodeIndex<NDIM> idx_ulu(idx, NodeIndex<NDIM>::ULU);
+                    NodeIndex<NDIM> idx_uul(idx, NodeIndex<NDIM>::UUL);
+                    NodeIndex<NDIM> idx_uuu(idx, NodeIndex<NDIM>::UUU);
+                    VectorNd grad_phi;
+                    grad_phi[0] =
+                        (((*ls_data)(idx_ull)) + (*ls_data)(idx_ulu) + (*ls_data)(idx_uul) + (*ls_data)(idx_uuu) -
+                         ((*ls_data)(idx_lll) + (*ls_data)(idx_llu) + (*ls_data)(idx_lul) + (*ls_data)(idx_luu))) /
+                        (0.25 * dx[0]);
+                    grad_phi[1] =
+                        (((*ls_data)(idx_lul)) + (*ls_data)(idx_luu) + (*ls_data)(idx_uul) + (*ls_data)(idx_uuu) -
+                         ((*ls_data)(idx_lll) + (*ls_data)(idx_llu) + (*ls_data)(idx_ull) + (*ls_data)(idx_ulu))) /
+                        (0.25 * dx[1]);
+                    grad_phi[2] =
+                        (((*ls_data)(idx_llu)) + (*ls_data)(idx_luu) + (*ls_data)(idx_ulu) + (*ls_data)(idx_uuu) -
+                         ((*ls_data)(idx_lll) + (*ls_data)(idx_lul) + (*ls_data)(idx_ull) + (*ls_data)(idx_uul))) /
+                        (0.25 * dx[2]);
+                    double dist = LS::node_to_cell(idx, *ls_data) / grad_phi.norm();
+#endif
                     for (int l = 0; l < Q_data->getDepth(); ++l)
                     {
                         if (d_homogeneous_bdry)

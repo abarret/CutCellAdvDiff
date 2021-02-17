@@ -9,6 +9,8 @@
 
 #include "libmesh/elem.h"
 
+#include "boost/multi_array.hpp"
+
 #include "Eigen/Dense"
 
 namespace LS
