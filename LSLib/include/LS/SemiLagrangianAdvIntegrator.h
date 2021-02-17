@@ -247,6 +247,8 @@ private:
     double weight(double r);
 
     RBFPolyOrder d_rbf_poly_order = RBFPolyOrder::UNKNOWN_ORDER;
+
+    int d_diff_iter_num = 1;
 }; // Class SemiLagrangianAdvIntegrator
 } // Namespace LS
 

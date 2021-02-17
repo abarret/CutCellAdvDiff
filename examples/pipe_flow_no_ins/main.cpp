@@ -259,7 +259,6 @@ main(int argc, char* argv[])
         // Setup the level set function
         Pointer<NodeVariable<NDIM, double>> ls_var = new NodeVariable<NDIM, double>("LS");
         adv_diff_integrator->registerLevelSetVariable(ls_var);
-        adv_diff_integrator->registerLevelSetVelocity(ls_var, u_var);
         bool use_ls_fcn = input_db->getBool("USING_LS_FCN");
         Pointer<LSFindCellVolume> vol_fcn;
         if (use_ls_fcn)

@@ -67,13 +67,20 @@ public:
         return d_fl_names;
     }
 
+    inline const std::vector<SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>>>& getFLVariables()
+    {
+        return d_fl_vars;
+    }
+
     void setLSData(int ls_idx, int vol_idx, SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy);
 
-    void
-    integrateHierarchy(SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> ctx, double current_time, double new_time);
+    void integrateHierarchy(SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> ctx,
+                            double current_time,
+                            double new_time,
+                            int cycle_num);
 
-    void beginTimestepping(double current_time, double new_time);
-    void endTimestepping(double current_time, double new_time);
+    void beginTimestepping(double current_time, double new_time, bool update_time_vals = true);
+    void endTimestepping(double current_time, double new_time, bool update_time_vals = true);
 
     void interpolateToBoundary(SAMRAI::tbox::Pointer<SAMRAI::pdat::CellVariable<NDIM, double>> fl_var,
                                SAMRAI::tbox::Pointer<SAMRAI::hier::VariableContext> ctx,

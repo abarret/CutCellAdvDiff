@@ -29,6 +29,8 @@ ADV_INT_METHOD = "MIDPOINT_RULE"
 DIF_INT_METHOD = "TRAPEZOIDAL_RULE"
 USE_RBFS = TRUE
 RBF_STENCIL_SIZE = 2
+RBF_POLY_ORDER = "QUADRATIC"
+
 REACT_FRAC = 0.25
 
 ERROR_ON_MOVE = TRUE
@@ -339,6 +341,7 @@ AdvDiffSemiImplicitHierarchyIntegrator {
     diffusion_ts_type = DIF_INT_METHOD
     use_rbfs = USE_RBFS
     rbf_stencil_size = RBF_STENCIL_SIZE
+    rbf_poly_order = RBF_POLY_ORDER
 
     tag_buffer = TAG_BUFFER
     

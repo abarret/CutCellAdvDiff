@@ -167,6 +167,7 @@ main3d
 *.log
 *bdry_info*
 *.png
+*.eps
 *.py
 \.*
 *.avi

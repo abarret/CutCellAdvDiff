@@ -80,23 +80,72 @@ void computeSurfaceErrors(const MeshBase& mesh,
                           double time);
 
 static double k_on, k_off, sf_max, D_coef;
+static bool use_exact_fl, use_exact_sf;
 double
 a_fcn(double Q_bdry, const std::vector<double>& fl_vals, const std::vector<double>& sf_vals, double time, void* ctx)
 {
-    return k_on * (sf_max - sf_vals[0]) * Q_bdry;
+    if (use_exact_sf)
+    {
+        double sf_val = time * (1.0 + time);
+        return k_on * (sf_max - sf_val) * Q_bdry;
+    }
+    else
+    {
+        return k_on * (sf_max - sf_vals[0]) * Q_bdry;
+    }
+}
+
+double
+a_fcn_exact(double Q_bdry,
+            const std::vector<double>& fl_vals,
+            const std::vector<double>& sf_vals,
+            double time,
+            void* ctx)
+{
+    double sf_val = time * (1.0 + time);
+    return k_on * (sf_max - sf_val) * Q_bdry;
 }
 
 double
 g_fcn(double Q_bdry, const std::vector<double>& fl_vals, const std::vector<double>& sf_vals, double time, void* ctx)
 {
-    return k_off * sf_vals[0];
+    if (use_exact_sf)
+    {
+        double sf_val = time * (1.0 + time);
+        return k_off * sf_val;
+    }
+    else
+    {
+        return k_off * sf_vals[0];
+    }
+}
+
+double
+g_fcn_exact(double Q_bdry,
+            const std::vector<double>& fl_vals,
+            const std::vector<double>& sf_vals,
+            double time,
+            void* ctx)
+{
+    double sf_val = time * (1.0 + time);
+    return k_off * sf_val;
 }
 
 double
 sf_ode(double q, const std::vector<double>& fl_vals, const std::vector<double>& sf_vals, double time, void* ctx)
 {
-    double ode_val = k_on * (sf_max - q) * fl_vals[0] - k_off * q;
     double t = time;
+    double ode_val = 0.0;
+    if (use_exact_fl)
+    {
+        double fl_val =
+            1.0 + (-sf_max * k_on + (k_off + k_on) * t * (1.0 + t)) / (2.0 * D_coef + k_on * (sf_max - t * (1.0 + t)));
+        ode_val = k_on * (sf_max - q) * fl_val - k_off * q;
+    }
+    else
+    {
+        ode_val = k_on * (sf_max - q) * fl_vals[0] - k_off * q;
+    }
     double denom = 2.0 * D_coef + k_on * (sf_max - t * (1 + t));
     double force = 1.0 + 2.0 * t + k_off * t * (1.0 + t) -
                    (k_on * (sf_max - t * (1.0 + t)) * (2.0 * D_coef + k_off * t * (1.0 + t))) / denom;
@@ -162,6 +211,8 @@ main(int argc, char* argv[])
         k_on = input_db->getDouble("K_ON");
         k_off = input_db->getDouble("K_OFF");
         D_coef = input_db->getDouble("D_COEF");
+        use_exact_sf = input_db->getBool("USE_EXACT_SF");
+        use_exact_fl = input_db->getBool("USE_EXACT_FL");
         VectorNd cent;
         input_db->getDoubleArray("CENTER", cent.data(), NDIM);
 
@@ -247,7 +298,6 @@ main(int argc, char* argv[])
         // Setup the level set function
         Pointer<NodeVariable<NDIM, double>> ls_var = new NodeVariable<NDIM, double>("LS_In");
         adv_diff_integrator->registerLevelSetVariable(ls_var);
-        adv_diff_integrator->registerLevelSetVelocity(ls_var, u_var);
 
         Pointer<LSFromMesh> vol_fcn = new LSFromMesh(
             "LSFromMesh", patch_hierarchy, &reaction_mesh, ib_method_ops->getFEDataManager(REACTION_MESH_ID), true);
@@ -298,16 +348,26 @@ main(int argc, char* argv[])
         Pointer<LSCutCellLaplaceOperator> sol_in_oper = new LSCutCellLaplaceOperator(
             "LSCutCellInOperator", app_initializer->getComponentDatabase("LSCutCellOperator"), false);
         // Create boundary operators
-        Pointer<SBBoundaryConditions> bdry_conditions =
-            new SBBoundaryConditions("SBBoundaryConditions",
+        Pointer<SBBoundaryConditions> bdry_conditions_rhs =
+            new SBBoundaryConditions("SBBoundaryConditionsRHS",
                                      app_initializer->getComponentDatabase("SBBoundaryConditions"),
                                      &reaction_mesh,
-                                     ib_method_ops->getFEDataManager(REACTION_MESH_ID));
-        bdry_conditions->registerFluidSurfaceInteraction(sf_name);
-        bdry_conditions->setReactionFunction(&a_fcn, &g_fcn, nullptr);
-        bdry_conditions->setFluidContext(adv_diff_integrator->getCurrentContext());
-        rhs_in_oper->setBoundaryConditionOperator(bdry_conditions);
-        sol_in_oper->setBoundaryConditionOperator(bdry_conditions);
+                                     ib_method_ops->getFEDataManager(REACTION_MESH_ID),
+                                     true /*use_old_soln*/);
+        Pointer<SBBoundaryConditions> bdry_conditions_sol =
+            new SBBoundaryConditions("SBBoundaryConditionsSol",
+                                     app_initializer->getComponentDatabase("SBBoundaryConditions"),
+                                     &reaction_mesh,
+                                     ib_method_ops->getFEDataManager(REACTION_MESH_ID),
+                                     false /*use_old_soln*/);
+        bdry_conditions_rhs->registerFluidSurfaceInteraction(sf_name);
+        bdry_conditions_rhs->setReactionFunction(&a_fcn, &g_fcn, nullptr);
+        bdry_conditions_rhs->setFluidContext(adv_diff_integrator->getCurrentContext());
+        bdry_conditions_sol->registerFluidSurfaceInteraction(sf_name);
+        bdry_conditions_sol->setReactionFunction(&a_fcn, &g_fcn, nullptr);
+        bdry_conditions_sol->setFluidContext(adv_diff_integrator->getCurrentContext());
+        rhs_in_oper->setBoundaryConditionOperator(bdry_conditions_rhs);
+        sol_in_oper->setBoundaryConditionOperator(bdry_conditions_sol);
 
         adv_diff_integrator->setHelmholtzRHSOperator(Q_in_var, rhs_in_oper);
         Pointer<PETScKrylovPoissonSolver> Q_in_helmholtz_solver = new PETScKrylovPoissonSolver(
@@ -597,25 +657,6 @@ computeFluidErrors(Pointer<CellVariable<NDIM, double>> Q_var,
         }
     }
     pout << "Error in fluid at time: " << time << "\n";
-    pout << "  L1-norm:   " << std::setprecision(10) << hier_cc_data_ops.L1Norm(Q_error_idx, wgt_cc_idx) << "\n";
-    pout << "  L2-norm:   " << std::setprecision(10) << hier_cc_data_ops.L2Norm(Q_error_idx, wgt_cc_idx) << "\n";
-    pout << "  max-norm:  " << std::setprecision(10) << hier_cc_data_ops.maxNorm(Q_error_idx, wgt_cc_idx) << "\n";
-    for (int ln = 0; ln <= hierarchy->getFinestLevelNumber(); ++ln)
-    {
-        Pointer<PatchLevel<NDIM>> level = hierarchy->getPatchLevel(ln);
-        for (PatchLevel<NDIM>::Iterator p(level); p; p++)
-        {
-            Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            Pointer<CellData<NDIM, double>> vol_data = patch->getPatchData(vol_idx);
-            Pointer<CellData<NDIM, double>> wgt_data = patch->getPatchData(wgt_cc_idx);
-            for (CellIterator<NDIM> ci(patch->getBox()); ci; ci++)
-            {
-                const CellIndex<NDIM>& idx = ci();
-                (*wgt_data)(idx) = (*vol_data)(idx) < 1.0 ? 0.0 : (*wgt_data)(idx);
-            }
-        }
-    }
-    pout << "Error in fluid without cut cells at time: " << time << "\n";
     pout << "  L1-norm:   " << std::setprecision(10) << hier_cc_data_ops.L1Norm(Q_error_idx, wgt_cc_idx) << "\n";
     pout << "  L2-norm:   " << std::setprecision(10) << hier_cc_data_ops.L2Norm(Q_error_idx, wgt_cc_idx) << "\n";
     pout << "  max-norm:  " << std::setprecision(10) << hier_cc_data_ops.maxNorm(Q_error_idx, wgt_cc_idx) << "\n";

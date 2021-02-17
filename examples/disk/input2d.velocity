@@ -11,7 +11,7 @@ BASE_NAME = "test1"
 // grid spacing parameters
 MAX_LEVELS = 1                            // maximum number of levels in locally refined grid
 REF_RATIO  = 4                            // refinement ratio between levels
-N = 512                                    // coarsest grid spacing
+N = 128                                    // coarsest grid spacing
 NFINEST = (REF_RATIO^(MAX_LEVELS - 1))*N  // finest   grid spacing
 DX = 2.0*LY/NFINEST
 H = DX
@@ -29,7 +29,11 @@ ADV_INT_METHOD = "MIDPOINT_RULE"
 DIF_INT_METHOD = "TRAPEZOIDAL_RULE"
 USE_RBFS = TRUE
 RBF_STENCIL_SIZE = 2
-REACT_FRAC = 0.25
+RBF_POLY_ORDER = "QUADRATIC"
+DIFF_ITER_NUM = 2
+
+USE_EXACT_SF = FALSE
+USE_EXACT_FL = FALSE
 
 ERROR_ON_MOVE = TRUE
 MFAC = 1.5
@@ -63,7 +67,7 @@ CONVECTIVE_TS_TYPE         = "FORWARD_EULER"      // convective time stepping ty
 CONVECTIVE_OP_TYPE         = "STABILIZED_PPM"       // convective differencing discretization type
 CONVECTIVE_FORM            = "ADVECTIVE"            // how to compute the convective terms
 NORMALIZE_PRESSURE         = FALSE                  // whether to explicitly force the pressure to have mean zero
-CFL_MAX                    = 0.1                    // maximum CFL number
+CFL_MAX                    = 0.25                    // maximum CFL number
 DT                         = CFL_MAX*DX/U_MAX       // maximum timestep size
 START_TIME                 = 0.0e0                  // initial simulation time
 END_TIME                   = 1.0                 // final simulation time
@@ -272,7 +276,7 @@ Main {
    data_dump_interval          = 0
    data_dump_dirname           = "hier_data_IB2d"
 
-   timer_dump_interval = 0//NFINEST/8
+   timer_dump_interval = NFINEST/8
 }
 
 CartesianGeometry {
@@ -315,6 +319,7 @@ TimerManager{
    print_exclusive = TRUE
    print_total     = TRUE
    print_threshold = 0.0
+   print_timer_overhead = TRUE
    timer_list      = "LS::*::*","IBAMR::*::*","IBTK::*::*"
 }
 
@@ -338,6 +343,8 @@ AdvDiffSemiImplicitHierarchyIntegrator {
     diffusion_ts_type = DIF_INT_METHOD
     use_rbfs = USE_RBFS
     rbf_stencil_size = RBF_STENCIL_SIZE
+    rbf_poly_order = RBF_POLY_ORDER
+    diffusion_solve_iterations = DIFF_ITER_NUM
 
     tag_buffer = TAG_BUFFER
     
@@ -371,28 +378,4 @@ IBFESurfaceMethod {
    IB_point_density           = IB_POINT_DENSITY
 //   constrain_tangential_motion = TRUE
 //   constrain_interior_faces = TRUE
-}
-
-INSStaggeredHierarchyIntegrator {
-   mu                            = MU
-   rho                           = RHO
-   start_time                    = START_TIME
-   end_time                      = END_TIME
-   grow_dt                       = GROW_DT
-   convective_time_stepping_type = CONVECTIVE_TS_TYPE
-   convective_op_type            = CONVECTIVE_OP_TYPE
-   convective_difference_form    = CONVECTIVE_FORM
-   normalize_pressure            = NORMALIZE_PRESSURE
-   cfl                           = CFL_MAX
-   dt_max                        = DT
-   using_vorticity_tagging       = VORTICITY_TAGGING
-   vorticity_rel_thresh          = 0.01
-   tag_buffer                    = TAG_BUFFER
-   output_U                      = OUTPUT_U
-   output_P                      = OUTPUT_P
-   output_F                      = OUTPUT_F
-   output_Omega                  = OUTPUT_OMEGA
-   output_Div_U                  = OUTPUT_DIV_U
-   enable_logging                = ENABLE_LOGGING
-   num_cycles = 1
 }
