@@ -642,12 +642,11 @@ SemiLagrangianAdvIntegrator::preprocessIntegrateHierarchy(const double current_t
         PoissonSpecifications rhs_spec(d_object_name + "::rhs_spec" + Q_var->getName());
         PoissonSpecifications solv_spec(d_object_name + "::solv_spec" + Q_var->getName());
 
-        const double dt_scale = d_use_strang_splitting ? 2.0 : 1.0;
-        solv_spec.setCConstant(dt_scale / dt + K * lambda);
-        rhs_spec.setCConstant(dt_scale / dt - (1.0 - K) * lambda);
+        solv_spec.setCConstant(0.0);
+        rhs_spec.setCConstant(0.0);
         const double kappa = d_Q_diffusion_coef[Q_var];
-        solv_spec.setDConstant(-K * kappa);
-        rhs_spec.setDConstant((1.0 - K) * kappa);
+        solv_spec.setDConstant(-1.0 * kappa);
+        rhs_spec.setDConstant(0.0);
 
         // Initialize RHS Operator
         Pointer<LSCutCellLaplaceOperator> rhs_oper = d_helmholtz_rhs_ops[l];

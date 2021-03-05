@@ -9,11 +9,13 @@
 #include "ibtk/PETScKrylovPoissonSolver.h"
 #include "ibtk/PoissonSolver.h"
 
+#include "LS/CutCellMeshMapping.h"
 #include "LS/LSCutCellLaplaceOperator.h"
 #include "LS/LSFindCellVolume.h"
 #include "LS/MLSReconstructCache.h"
 #include "LS/RBFReconstructCache.h"
 #include "LS/SBIntegrator.h"
+#include "LS/SBSurfaceFluidCouplingManager.h"
 #include "LS/utility_functions.h"
 
 namespace LS
