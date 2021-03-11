@@ -87,7 +87,6 @@ QFcn::setDataOnPatchHierarchy(const int data_idx,
                 const CellIndex<NDIM>& idx = ci();
                 if ((*vol_data)(idx) > 0.0)
                 {
-                    VectorNd X = LS::find_cell_centroid(idx, *ls_data);
                     (*Q_data)(idx) /= (*vol_data)(idx)*dx[0] * dx[1]
 #if (NDIM == 3)
                                       * dx[2]

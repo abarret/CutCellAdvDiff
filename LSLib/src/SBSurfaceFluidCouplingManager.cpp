@@ -345,11 +345,11 @@ SBSurfaceFluidCouplingManager::updateJacobian()
         const auto n_basis = static_cast<unsigned int>(J_dof_indices.size());
         M_e.resize(n_basis, n_basis);
         F_e.resize(n_basis);
-        boost::multi_array<double, NDIM> x_node;
+        boost::multi_array<double, 2> x_node;
 
         const auto& X_dof_indices = X_dof_map_cache.dof_indices(elem);
         IBTK::get_values_for_interpolation(x_node, *X_petsc_vec, X_local_soln, X_dof_indices);
-        boost::multi_array<double, NDIM> X_node(boost::extents[X_dof_indices[0].size()][X_dof_indices.size()]);
+        boost::multi_array<double, 2> X_node(boost::extents[X_dof_indices[0].size()][X_dof_indices.size()]);
         for (unsigned int k = 0; k < elem->n_nodes(); ++k)
         {
             for (unsigned int d = 0; d < NDIM; ++d) X_node[k][d] = elem->point(k)(d);

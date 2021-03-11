@@ -51,9 +51,9 @@ area_fraction(const double reg_area, const double phi_ll, const double phi_lu, c
     if (phi_lu < 0.0) vertices.push_back({ 0.0, 1.0 });
     if (phi_lu * phi_uu < 0.0) vertices.push_back({ -phi_lu / (phi_uu - phi_lu), 1.0 });
     if (phi_uu < 0.0) vertices.push_back({ 1.0, 1.0 });
-    if (phi_uu * phi_ul < 0.0) vertices.push_back({ 1.0, 1.0 - phi_uu / (phi_ul - phi_uu) });
+    if (phi_uu * phi_ul < 0.0) vertices.push_back({ 1.0, 1.0 + phi_uu / (phi_ul - phi_uu) });
     if (phi_ul < 0.0) vertices.push_back({ 1.0, 0.0 });
-    if (phi_ul * phi_ll < 0.0) vertices.push_back({ 1.0 - phi_ul / (phi_ll - phi_ul), 0.0 });
+    if (phi_ul * phi_ll < 0.0) vertices.push_back({ 1.0 + phi_ul / (phi_ll - phi_ul), 0.0 });
 
     // We have vertices, now use shoelace formula to find area
     double A = 0.0;

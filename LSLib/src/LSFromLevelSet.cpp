@@ -61,7 +61,6 @@ LSFromLevelSet::updateVolumeAreaSideLS(int vol_idx,
         for (PatchLevel<NDIM>::Iterator p(level); p; p++)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
-
             Pointer<NodeData<NDIM, double>> phi_data = patch->getPatchData(phi_idx);
             Pointer<CellData<NDIM, double>> area_data;
             if (area_idx != IBTK::invalid_index) area_data = patch->getPatchData(area_idx);

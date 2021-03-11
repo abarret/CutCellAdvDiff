@@ -334,8 +334,6 @@ LSCutCellLaplaceOperator::computeHelmholtzAction(const CellData<NDIM, double>& Q
         for (unsigned int l = 0; l < d_bc_coefs.size(); ++l)
         {
             R_data(idx, l) = 0.0;
-            // TODO: For NDIM == 3 Update length_fraction to calculate partial face areas instead of
-            // lengths.
             // Loop through X faces
             for (int f = 0; f < 2; ++f)
             {
@@ -372,7 +370,6 @@ LSCutCellLaplaceOperator::computeHelmholtzAction(const CellData<NDIM, double>& Q
             for (int f = 0; f < 2; ++f)
             {
                 const int sgn = f == 0 ? -1 : 1;
-                // Note the awkward ordering of indices. Needs to start at "bottom left" index and go clockwise
                 const double L = dx[0] * dx[1] * (*side_data)(SideIndex<NDIM>(idx, 2, f));
                 double Q_next = Q_data(idx + zp * sgn);
                 double vol_next = (*vol_data)(idx + zp * sgn);
