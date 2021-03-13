@@ -171,7 +171,6 @@ main(int argc, char* argv[])
         Pointer<PETScKrylovPoissonSolver> Q_helmholtz_solver = new PETScKrylovPoissonSolver(
             "PoissonSolver", app_initializer->getComponentDatabase("PoissonSolver"), "poisson_solve_");
         Q_helmholtz_solver->setOperator(sol_oper);
-        Q_helmholtz_solver->setNullspace(true);
         time_integrator->setHelmholtzSolver(Q_var, Q_helmholtz_solver);
 
         // Create a scratch volume, area, and level set

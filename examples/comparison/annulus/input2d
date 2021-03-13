@@ -6,12 +6,12 @@ BASE_NAME = "test1"
 // grid spacing parameters
 MAX_LEVELS = 1                            // maximum number of levels in locally refined grid
 REF_RATIO  = 4                            // refinement ratio between levels
-N = 64                                    // coarsest grid spacing
+N = 256                                    // coarsest grid spacing
 NFINEST = (REF_RATIO^(MAX_LEVELS - 1))*N  // finest   grid spacing
 H = L/NFINEST
 CFL_MAX = 0.5
-DT_MAX = H * CFL_MAX / 1.0
-END_TIME = 50.0
+DT_MAX = 0.01
+END_TIME = 100.0
 REGRID_INTERVAL = 1
 
 OUTPUT_BDRY_INFO = TRUE
@@ -26,6 +26,7 @@ DIF_INT_METHOD = "BACKWARD_EULER"
 USE_RBFS = TRUE
 RBF_STENCIL_SIZE = 3
 RBF_POLY_ORDER = "QUADRATIC"
+USE_FORCING = TRUE
 
 USING_CIRCLE = TRUE
 STATIONARY_INTERFACE = FALSE
@@ -157,7 +158,7 @@ CartesianGeometry {
    domain_boxes = [ (0,0),(N - 1,N - 1) ]
    x_lo = 0,0
    x_up = L, L
-   periodic_dimension = 0,0
+   periodic_dimension = 1,1
 }
 
 GriddingAlgorithm {
