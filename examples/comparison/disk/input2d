@@ -1,0 +1,214 @@
+// physical parameters
+PI = 3.14159265358979
+L = 2.0 * PI
+BASE_NAME = "test1"
+
+// grid spacing parameters
+MAX_LEVELS = 1                            // maximum number of levels in locally refined grid
+REF_RATIO  = 4                            // refinement ratio between levels
+N = 240                                    // coarsest grid spacing
+NFINEST = (REF_RATIO^(MAX_LEVELS - 1))*N  // finest   grid spacing
+H = L/NFINEST
+DT_MAX = 100.0
+END_TIME = 100.0
+REGRID_INTERVAL = 1
+
+OUTPUT_BDRY_INFO = TRUE
+USING_LS_FCN = FALSE
+DRAW_EXACT = TRUE
+MIN_REFINE_FACTOR = -20.0
+MAX_REFINE_FACTOR = 2.0
+LEAST_SQUARES_ORDER = "QUADRATIC"
+USE_STRANG_SPLITTING = TRUE
+ADV_INT_METHOD = "MIDPOINT_RULE"
+DIF_INT_METHOD = "TRAPEZOIDAL_RULE"
+USE_RBFS = TRUE
+RBF_STENCIL_SIZE = 3
+RBF_POLY_ORDER = "QUADRATIC"
+
+USING_CIRCLE = TRUE
+STATIONARY_INTERFACE = FALSE
+USING_VEL_FCN = TRUE
+
+XCOM = PI
+YCOM = PI
+R = 1.5
+
+D_coef = 1.0
+
+U = "0.0"
+V = "0.0"
+
+Q = "sin(X_0)*sin(X_1)"
+
+// Level set parameters
+LS_REINIT_INTERVAL = REGRID_INTERVAL
+MAX_ITERATIONS_LS     = NFINEST/4
+LS_ORDER           = "THIRD_ORDER_ENO"
+USE_SUBCELL_FIX    = TRUE
+USE_SIGN_FIX       = TRUE
+LS_ATOL            = 1e-10
+
+RelaxationLSMethod {
+    order              = LS_ORDER
+    apply_subcell_fix  = USE_SUBCELL_FIX
+    apply_sign_fix     = USE_SIGN_FIX
+    sweep_abs_tol      = LS_ATOL
+    max_iterations     = MAX_ITERATIONS_LS
+    enable_logging     = TRUE
+    reinit_interval    = LS_REINIT_INTERVAL
+}
+
+LSCutCellOperator {
+  robin_boundary = TRUE
+  cache_boundary = TRUE
+  use_rbfs = USE_RBFS
+  stencil_size = RBF_STENCIL_SIZE
+}
+
+BdryOperator {
+    a_coef = 1.0
+    D = D_coef
+    R = R
+    velocity = 0.0,0.0
+    Center = XCOM,YCOM
+    R1 = R
+}
+
+SetLSValue {
+    interface_type = "DISK"
+    R1 = R
+    Center = XCOM,YCOM
+    Vel = 0.0,0.0
+}
+
+FFcn {
+    kappa = D_coef
+    function = "2.0 * kappa * sin(X_0) * sin(X_1)"
+}
+
+QInitial {
+    integrate_function = TRUE
+    init_type = "RADIAL"
+    D = D_coef
+    R1 = 1.0
+    Center = XCOM,YCOM
+    velocity = 0.0,0.0
+}
+
+PoissonSolver {
+}
+
+UFunction {
+   function_0 = U
+   function_1 = V
+}
+
+Q_bcs {
+    D = 1.0
+
+    acoef_function_0 = "1.0"
+    acoef_function_1 = "1.0"
+    acoef_function_2 = "1.0"
+    acoef_function_3 = "1.0"
+
+    bcoef_function_0 = "0.0"
+    bcoef_function_1 = "0.0"
+    bcoef_function_2 = "0.0"
+    bcoef_function_3 = "0.0"
+
+    gcoef_function_0 = Q
+    gcoef_function_1 = Q
+    gcoef_function_2 = Q
+    gcoef_function_3 = Q
+}
+
+Main {
+
+// log file parameters
+   log_file_name               = "test.log"
+   log_all_nodes               = FALSE
+
+// visualization dump parameters
+   viz_writer                  = "VisIt"
+   viz_dump_interval           = 1//NFINEST/8
+   viz_dump_dirname            = "viz_adv_diff2d"
+   visit_number_procs_per_file = 1
+
+// restart dump parameters
+   restart_dump_interval       = 0
+   restart_dump_dirname        = "restart_adv_diff2d"
+}
+
+CartesianGeometry {
+   domain_boxes = [ (0,0),(N - 1,N - 1) ]
+   x_lo = 0,0
+   x_up = L, L
+   periodic_dimension = 0,0
+}
+
+GriddingAlgorithm {
+   max_levels = MAX_LEVELS
+   ratio_to_coarser {
+      level_1 = REF_RATIO,REF_RATIO
+      level_2 = REF_RATIO,REF_RATIO
+      level_3 = REF_RATIO,REF_RATIO
+   }
+   largest_patch_size {
+      level_0 = 512,512  // all finer levels will use same values as level_0
+   }
+   smallest_patch_size {
+      level_0 =   4,  4  // all finer levels will use same values as level_0
+   }
+   efficiency_tolerance = 0.5e0  // min % of tag cells in new patch level
+   combine_efficiency   = 0.5e0  // chop box if sum of volumes of smaller boxes < efficiency * vol of large box
+}
+
+StandardTagAndInitialize {
+   tagging_method = "GRADIENT_DETECTOR"
+   RefineBoxes {
+      level_0 = [( N/4,N/4 ),( 3*N/4 - 1,N/2 - 1 )],[( N/4,N/2 ),( N/2 - 1,3*N/4 - 1 )]
+   }
+}
+
+LoadBalancer {
+   bin_pack_method     = "SPATIAL"
+   max_workload_factor = 1
+}
+
+TimerManager{
+   print_exclusive = FALSE
+   print_total     = TRUE
+   print_threshold = 0.1
+   timer_list      = "IBAMR::*::*","IBTK::*::*","*::*::*"
+}
+
+
+AdvDiffSemiImplicitHierarchyIntegrator {
+    start_time           = 0.0e0  // initial simulation time
+    end_time             = END_TIME    // final simulation time
+    grow_dt              = 2.0e0  // growth factor for timesteps
+    max_integrator_steps = 10000  // max number of simulation timesteps
+    regrid_interval      = REGRID_INTERVAL  // effectively disable regridding
+    dt_max               = DT_MAX
+    dt_min               = DT_MAX
+    enable_logging       = TRUE
+
+    prescribe_level_set  = USING_LS_FCN
+    min_ls_refine_factor = MIN_REFINE_FACTOR
+    max_ls_refine_factor = MAX_REFINE_FACTOR
+    least_squares_order = LEAST_SQUARES_ORDER
+    use_strang_splitting = USE_STRANG_SPLITTING
+    advection_ts_type = ADV_INT_METHOD
+    diffusion_ts_type = DIF_INT_METHOD
+    use_rbfs = USE_RBFS
+    rbf_stencil_size = RBF_STENCIL_SIZE
+    rbf_poly_order = RBF_POLY_ORDER
+ 
+    convective_op_type                 = "PPM"//WAVE_PROP"
+    convective_difference_form         = "CONSERVATIVE"
+    convective_time_stepping_type      = "TRAPEZOIDAL_RULE"
+    init_convective_time_stepping_type = "MIDPOINT_RULE"
+    diffusion_time_stepping_type = "TRAPEZOIDAL_RULE"
+    num_cycles = 1
+}
