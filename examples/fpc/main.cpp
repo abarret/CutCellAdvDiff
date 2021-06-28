@@ -1,7 +1,6 @@
 #include "ibamr/config.h"
 
 #include "CCAD/LSCutCellLaplaceOperator.h"
-#include "CCAD/QInitial.h"
 #include "CCAD/SemiLagrangianAdvIntegrator.h"
 
 #include <ibamr/FESurfaceDistanceEvaluator.h>

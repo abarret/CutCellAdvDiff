@@ -3,7 +3,6 @@
 #include "CCAD/LSCutCellLaplaceOperator.h"
 #include "CCAD/LSFindCellVolume.h"
 #include "CCAD/LSFromLevelSet.h"
-#include "CCAD/QInitial.h"
 #include "CCAD/SemiLagrangianAdvIntegrator.h"
 #include "CCAD/app_namespaces.h"
 #include "CCAD/ls_functions.h"

@@ -30,7 +30,6 @@ SET(CXX_SRC
     LSFromMesh.cpp
     ls_functions.cpp
     MLSReconstructCache.cpp
-    QInitial.cpp
     RBFReconstructCache.cpp
     RBFReconstructions.cpp
     ReconstructCache.cpp
@@ -39,7 +38,6 @@ SET(CXX_SRC
     SBIntegrator.cpp
     SBSurfaceFluidCouplingManager.cpp
     SemiLagrangianAdvIntegrator.cpp
-    SetLSValue.cpp
     VolumeBoundaryMeshMapping.cpp
     ZSplineReconstructions.cpp
     )

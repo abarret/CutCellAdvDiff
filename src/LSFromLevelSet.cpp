@@ -41,11 +41,14 @@ LSFromLevelSet::updateVolumeAreaSideLS(int vol_idx,
 {
     int coarsest_ln = 0, finest_ln = d_hierarchy->getFinestLevelNumber();
 
-    Pointer<NodeVariable<NDIM, double>> phi_n_var = phi_var;
-    TBOX_ASSERT(phi_n_var);
+    TBOX_ASSERT(phi_var);
     TBOX_ASSERT(phi_idx != invalid_index);
 
-    if (d_set_ls) d_ls_fcn->setDataOnPatchHierarchy(phi_idx, phi_var, d_hierarchy, data_time);
+    if (d_set_ls)
+    {
+        pout << "Setting Level set at time " << data_time << "\n";
+        d_ls_fcn->setDataOnPatchHierarchy(phi_idx, phi_var, d_hierarchy, data_time);
+    }
     using ITC = HierarchyGhostCellInterpolation::InterpolationTransactionComponent;
     std::vector<ITC> ghost_cell_comp(1);
     ghost_cell_comp[0] = ITC(phi_idx, "LINEAR_REFINE", false, "CONSTANT_COARSEN", "LINEAR");

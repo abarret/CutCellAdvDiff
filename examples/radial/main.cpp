@@ -2,7 +2,6 @@
 
 #include "CCAD/LSCutCellLaplaceOperator.h"
 #include "CCAD/LSFromLevelSet.h"
-#include "CCAD/QInitial.h"
 #include "CCAD/SemiLagrangianAdvIntegrator.h"
 
 #include <ibamr/RelaxationLSMethod.h>
@@ -30,6 +29,7 @@
 // Local includes
 #include "QFcn.h"
 #include "RadialBoundaryCond.h"
+#include "SetLSValue.h"
 
 void output_to_file(const int Q_idx,
                     const int area_idx,
@@ -249,6 +249,7 @@ main(int argc, char* argv[])
         LocateInterface interface;
         if (!use_ls_fcn)
         {
+            pout << "Evolving level set\n";
             time_integrator->evolveLevelSet(ls_var, u_var);
             interface = LocateInterface(time_integrator->getLSCellVariable(ls_var), time_integrator, ls_fcn);
             Pointer<RelaxationLSMethod> ls_ops = new RelaxationLSMethod(

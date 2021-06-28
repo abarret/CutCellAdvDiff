@@ -4,7 +4,6 @@
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
 #include "CCAD/LSFindCellVolume.h"
-#include "CCAD/SetLSValue.h"
 #include "CCAD/ls_utilities.h"
 
 #include "ibtk/HierarchyGhostCellInterpolation.h"

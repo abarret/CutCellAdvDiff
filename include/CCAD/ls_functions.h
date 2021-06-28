@@ -1,9 +1,9 @@
 #ifndef included_CCAD_utility_functions
 #define included_CCAD_utility_functions
-
 #include "CCAD/LSFindCellVolume.h"
-#include "CCAD/SetLSValue.h"
 #include "CCAD/ls_utilities.h"
+
+#include "ibtk/ibtk_utilities.h"
 
 #include "NodeIndex.h"
 #include "Variable.h"

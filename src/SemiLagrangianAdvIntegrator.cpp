@@ -546,11 +546,14 @@ SemiLagrangianAdvIntegrator::preprocessIntegrateHierarchy(const double current_t
     }
 
     // TODO: This was placed here for restarts. We should only call reinitElementMappings() when required.
-    plog << d_object_name + ": Initializing fe mesh mappings\n";
-    for (const auto& fe_mesh_mapping : d_vol_bdry_mesh_mapping->getMeshPartitioners())
+    if (d_vol_bdry_mesh_mapping)
     {
-        fe_mesh_mapping->setPatchHierarchy(d_hierarchy);
-        fe_mesh_mapping->reinitElementMappings();
+        plog << d_object_name + ": Initializing fe mesh mappings\n";
+        for (const auto& fe_mesh_mapping : d_vol_bdry_mesh_mapping->getMeshPartitioners())
+        {
+            fe_mesh_mapping->setPatchHierarchy(d_hierarchy);
+            fe_mesh_mapping->reinitElementMappings();
+        }
     }
 
     if (d_vol_bdry_mesh_mapping) d_vol_bdry_mesh_mapping->matchBoundaryToVolume();
@@ -705,7 +708,7 @@ SemiLagrangianAdvIntegrator::preprocessIntegrateHierarchy(const double current_t
     for (const auto& Q_var : d_Q_var)
     {
         Pointer<NodeVariable<NDIM, double>> ls_var = d_Q_ls_map[Q_var];
-        unsigned int l = std::distance(std::find(d_ls_vars.begin(), d_ls_vars.end(), ls_var), d_ls_vars.begin());
+        unsigned int l = std::distance(d_ls_vars.begin(), std::find(d_ls_vars.begin(), d_ls_vars.end(), ls_var));
         Pointer<CellVariable<NDIM, double>> vol_var = d_vol_vars[l];
 
         auto var_db = VariableDatabase<NDIM>::getDatabase();
@@ -1016,11 +1019,14 @@ SemiLagrangianAdvIntegrator::initializeCompositeHierarchyDataSpecialized(const d
     plog << d_object_name + ": initializing composite Hierarchy data\n";
     if (initial_time)
     {
-        plog << d_object_name + ": Initializing fe mesh mappings\n";
-        for (const auto& fe_mesh_mapping : d_vol_bdry_mesh_mapping->getMeshPartitioners())
+        if (d_vol_bdry_mesh_mapping)
         {
-            fe_mesh_mapping->setPatchHierarchy(d_hierarchy);
-            fe_mesh_mapping->reinitElementMappings();
+            plog << d_object_name + ": Initializing fe mesh mappings\n";
+            for (const auto& fe_mesh_mapping : d_vol_bdry_mesh_mapping->getMeshPartitioners())
+            {
+                fe_mesh_mapping->setPatchHierarchy(d_hierarchy);
+                fe_mesh_mapping->reinitElementMappings();
+            }
         }
         auto var_db = VariableDatabase<NDIM>::getDatabase();
         // Set initial level set data
@@ -1095,9 +1101,12 @@ SemiLagrangianAdvIntegrator::regridHierarchyBeginSpecialized()
 void
 SemiLagrangianAdvIntegrator::regridHierarchyEndSpecialized()
 {
-    for (const auto& mesh_partitioner : d_vol_bdry_mesh_mapping->getMeshPartitioners())
+    if (d_vol_bdry_mesh_mapping)
     {
-        mesh_partitioner->reinitElementMappings();
+        for (const auto& mesh_partitioner : d_vol_bdry_mesh_mapping->getMeshPartitioners())
+        {
+            mesh_partitioner->reinitElementMappings();
+        }
     }
 }
 

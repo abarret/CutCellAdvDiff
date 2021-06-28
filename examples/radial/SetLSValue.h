@@ -1,5 +1,5 @@
-#ifndef included_CCAD_SetLSValue
-#define included_CCAD_SetLSValue
+#ifndef included_SetLSValue
+#define included_SetLSValue
 
 /////////////////////////////// INCLUDES /////////////////////////////////////
 
@@ -8,8 +8,6 @@
 
 #include <CartesianGridGeometry.h>
 
-namespace CCAD
-{
 /////////////////////////////// CLASS DEFINITION /////////////////////////////
 
 /*!
@@ -88,11 +86,6 @@ private:
      */
     SAMRAI::tbox::Pointer<SAMRAI::geom::CartesianGridGeometry<NDIM>> d_grid_geom;
 
-    /*
-     * The initialization type.
-     */
-    std::string d_interface_type = "ANNULUS";
-
     IBTK::VectorNd d_U;
 
     /*
@@ -108,6 +101,5 @@ private:
 
     bool d_extended_box = false;
 };
-} // namespace CCAD
 
-#endif //#ifndef included_LS_SetLSValue
+#endif //#ifndef included_SetLSValue

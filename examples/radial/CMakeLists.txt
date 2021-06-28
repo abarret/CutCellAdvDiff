@@ -8,7 +8,7 @@ CCAD_ADD_EXAMPLE(
   EXAMPLE_GROUP
     examples
   SOURCES
-    main.cpp QFcn.cpp RadialBoundaryCond.cpp
+    main.cpp QFcn.cpp RadialBoundaryCond.cpp SetLSValue.cpp
   LINK_TARGETS
     CCAD2d
   INPUT_FILES

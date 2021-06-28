@@ -6,7 +6,6 @@
 #include "CCAD/LSCutCellBoundaryConditions.h"
 #include "CCAD/LSFindCellVolume.h"
 #include "CCAD/RBFReconstructCache.h"
-#include "CCAD/SetLSValue.h"
 #include "CCAD/ls_utilities.h"
 
 #include "ibtk/HierarchyGhostCellInterpolation.h"

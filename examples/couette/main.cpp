@@ -2,7 +2,6 @@
 
 #include "CCAD/LSCutCellLaplaceOperator.h"
 #include "CCAD/LSFromLevelSet.h"
-#include "CCAD/QInitial.h"
 #include "CCAD/SemiLagrangianAdvIntegrator.h"
 
 #include <ibamr/RelaxationLSMethod.h>

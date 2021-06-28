@@ -2,7 +2,6 @@
 
 #include "CCAD/LSCutCellLaplaceOperator.h"
 #include "CCAD/LSFromMesh.h"
-#include "CCAD/QInitial.h"
 #include "CCAD/SBBoundaryConditions.h"
 #include "CCAD/SBIntegrator.h"
 #include "CCAD/SemiLagrangianAdvIntegrator.h"
