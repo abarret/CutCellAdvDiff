@@ -6,8 +6,10 @@
 
 namespace CCAD
 {
-CutCellMeshMapping::CutCellMeshMapping(std::string object_name, Pointer<Database> input_db)
-    : d_object_name(std::move(object_name))
+CutCellMeshMapping::CutCellMeshMapping(std::string object_name,
+                                       Pointer<Database> input_db,
+                                       const unsigned int num_parts)
+    : d_object_name(std::move(object_name)), d_num_parts(num_parts)
 {
     if (input_db) d_perturb_nodes = input_db->getBool("perturb_nodes");
 }

@@ -182,7 +182,7 @@ TimerManager{
 }
 
 
-AdvDiffSemiImplicitHierarchyIntegrator {
+LSAdvDiffIntegrator {
     start_time           = 0.0e0  // initial simulation time
     end_time             = END_TIME    // final simulation time
     grow_dt              = 2.0e0  // growth factor for timesteps
@@ -201,7 +201,7 @@ AdvDiffSemiImplicitHierarchyIntegrator {
     advection_ts_type = ADVECTION_TS_TYPE
     diffusion_ts_type = DIFFUSION_TS_TYPE
     use_rbfs = USE_RBFS
-  rbf_stencil_size = RBF_STENCIL_SIZE
+    rbf_stencil_size = RBF_STENCIL_SIZE
  
     convective_op_type                 = "PPM"//WAVE_PROP"
     convective_difference_form         = "CONSERVATIVE"

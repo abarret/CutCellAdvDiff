@@ -39,8 +39,6 @@ QFcn::setDataOnPatchHierarchy(const int data_idx,
     coarsest_ln = coarsest_ln < 0 ? 0 : coarsest_ln;
     finest_ln = finest_ln < 0 ? hierarchy->getFinestLevelNumber() : finest_ln;
 
-    auto integrator = CCAD::IntegrateFunction::getIntegrator();
-
     auto fcn = [this](VectorNd X, double t) -> double {
         X -= d_cent;
         return 1.0 + X.squaredNorm() * (-d_sf_max * d_k_on + (d_k_off + d_k_on) * t * (1.0 + t)) /
@@ -66,7 +64,7 @@ QFcn::setDataOnPatchHierarchy(const int data_idx,
                 const CellIndex<NDIM>& idx = ci();
                 if ((*vol_data)(idx) > 0.0)
                 {
-                    VectorNd cell_centroid = LS::find_cell_centroid(idx, *ls_data);
+                    VectorNd cell_centroid = CCAD::find_cell_centroid(idx, *ls_data);
                     for (int d = 0; d < NDIM; ++d)
                     {
                         cell_centroid[d] = xlow[d] + dx[d] * cell_centroid[d];

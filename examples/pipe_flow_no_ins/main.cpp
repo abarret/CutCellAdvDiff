@@ -1,11 +1,11 @@
 #include "ibamr/config.h"
 
+#include "CCAD/LSAdvDiffIntegrator.h"
 #include "CCAD/LSCutCellLaplaceOperator.h"
 #include "CCAD/LSFromLevelSet.h"
 #include "CCAD/LSFromMesh.h"
 #include "CCAD/SBBoundaryConditions.h"
 #include "CCAD/SBIntegrator.h"
-#include "CCAD/SemiLagrangianAdvIntegrator.h"
 
 #include <ibamr/FESurfaceDistanceEvaluator.h>
 #include <ibamr/IBExplicitHierarchyIntegrator.h>
@@ -78,7 +78,7 @@ void output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
                  Pointer<CellVariable<NDIM, double>> Q_var,
                  Pointer<CellVariable<NDIM, double>> vol_var,
                  Pointer<NodeVariable<NDIM, double>> ls_var,
-                 Pointer<SemiLagrangianAdvIntegrator> adv_diff_integrator,
+                 Pointer<LSAdvDiffIntegrator> adv_diff_integrator,
                  Mesh& mesh,
                  EquationSystems* eq_sys,
                  const int iteration_num,
@@ -210,10 +210,8 @@ main(int argc, char* argv[])
                                   app_initializer->getComponentDatabase("IBFESurfaceMethod"),
                                   meshes,
                                   app_initializer->getComponentDatabase("GriddingAlgorithm")->getInteger("max_levels"));
-        Pointer<SemiLagrangianAdvIntegrator> adv_diff_integrator = new SemiLagrangianAdvIntegrator(
-            "SemiLagrangianAdvIntegrator",
-            app_initializer->getComponentDatabase("AdvDiffSemiImplicitHierarchyIntegrator"),
-            false);
+        Pointer<LSAdvDiffIntegrator> adv_diff_integrator = new LSAdvDiffIntegrator(
+            "LSAdvDiffIntegrator", app_initializer->getComponentDatabase("LSAdvDiffIntegrator"), false);
 
         Pointer<PatchHierarchy<NDIM>> patch_hierarchy = new PatchHierarchy<NDIM>("PatchHierarchy", grid_geometry);
         Pointer<StandardTagAndInitialize<NDIM>> error_detector =
@@ -573,7 +571,7 @@ output_data(Pointer<PatchHierarchy<NDIM>> patch_hierarchy,
             Pointer<CellVariable<NDIM, double>> Q_var,
             Pointer<CellVariable<NDIM, double>> vol_var,
             Pointer<NodeVariable<NDIM, double>> ls_var,
-            Pointer<SemiLagrangianAdvIntegrator> adv_diff_integrator,
+            Pointer<LSAdvDiffIntegrator> adv_diff_integrator,
             Mesh& mesh,
             EquationSystems* eq_sys,
             const int iteration_num,

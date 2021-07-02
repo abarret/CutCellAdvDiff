@@ -1,8 +1,8 @@
 #include "ibamr/config.h"
 
+#include "CCAD/LSAdvDiffIntegrator.h"
 #include "CCAD/LSCutCellLaplaceOperator.h"
 #include "CCAD/LSFromLevelSet.h"
-#include "CCAD/SemiLagrangianAdvIntegrator.h"
 
 #include <ibamr/RelaxationLSMethod.h>
 
@@ -186,10 +186,8 @@ main(int argc, char* argv[])
         // and, if this is a restarted run, from the restart database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<SemiLagrangianAdvIntegrator> time_integrator = new SemiLagrangianAdvIntegrator(
-            "SemiLagrangianAdvIntegrator",
-            app_initializer->getComponentDatabase("AdvDiffSemiImplicitHierarchyIntegrator"),
-            false);
+        Pointer<LSAdvDiffIntegrator> time_integrator = new LSAdvDiffIntegrator(
+            "LSAdvDiffIntegrator", app_initializer->getComponentDatabase("LSAdvDiffIntegrator"), false);
 
         Pointer<PatchHierarchy<NDIM>> patch_hierarchy = new PatchHierarchy<NDIM>("PatchHierarchy", grid_geometry);
         Pointer<StandardTagAndInitialize<NDIM>> error_detector =

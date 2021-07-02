@@ -1,10 +1,11 @@
 #include "ibamr/config.h"
 
+#include "CCAD/CutCellVolumeMeshMapping.h"
 #include "CCAD/LSCutCellLaplaceOperator.h"
 #include "CCAD/LSFromMesh.h"
+#include "CCAD/SBAdvDiffIntegrator.h"
 #include "CCAD/SBBoundaryConditions.h"
 #include "CCAD/SBIntegrator.h"
-#include "CCAD/SemiLagrangianAdvIntegrator.h"
 
 #include <ibamr/FESurfaceDistanceEvaluator.h>
 #include <ibamr/IBExplicitHierarchyIntegrator.h>
@@ -49,7 +50,7 @@
 #include "QFcn.h"
 
 void postprocess_data(Pointer<PatchHierarchy<NDIM>> hierarchy,
-                      Pointer<SemiLagrangianAdvIntegrator> integrator,
+                      Pointer<SBAdvDiffIntegrator> integrator,
                       Pointer<CellVariable<NDIM, double>> Q_in_var,
                       int iteration_num,
                       double loop_time,
@@ -203,10 +204,8 @@ main(int argc, char* argv[])
                                   app_initializer->getComponentDatabase("IBFESurfaceMethod"),
                                   meshes,
                                   app_initializer->getComponentDatabase("GriddingAlgorithm")->getInteger("max_levels"));
-        Pointer<SemiLagrangianAdvIntegrator> adv_diff_integrator = new SemiLagrangianAdvIntegrator(
-            "SemiLagrangianAdvIntegrator",
-            app_initializer->getComponentDatabase("AdvDiffSemiImplicitHierarchyIntegrator"),
-            false);
+        Pointer<SBAdvDiffIntegrator> adv_diff_integrator = new SBAdvDiffIntegrator(
+            "SBAdvDiffIntegrator", app_initializer->getComponentDatabase("SBAdvDiffIntegrator"), false);
 
         Pointer<PatchHierarchy<NDIM>> patch_hierarchy = new PatchHierarchy<NDIM>("PatchHierarchy", grid_geometry);
         Pointer<StandardTagAndInitialize<NDIM>> error_detector =
@@ -240,8 +239,11 @@ main(int argc, char* argv[])
         Pointer<NodeVariable<NDIM, double>> ls_var = new NodeVariable<NDIM, double>("LS_In");
         adv_diff_integrator->registerLevelSetVariable(ls_var);
 
-        Pointer<LSFromMesh> vol_fcn = new LSFromMesh(
-            "LSFromMesh", patch_hierarchy, &reaction_mesh, ib_method_ops->getFEDataManager(REACTION_MESH_ID), true);
+        Pointer<CutCellVolumeMeshMapping> cut_cell_mapping =
+            new CutCellVolumeMeshMapping("CutCellMeshMapping",
+                                         app_initializer->getComponentDatabase("CutCellMeshMapping"),
+                                         ib_method_ops->getFEDataManager());
+        Pointer<LSFromMesh> vol_fcn = new LSFromMesh("LSFromMesh", patch_hierarchy, cut_cell_mapping, true);
         adv_diff_integrator->registerLevelSetVolFunction(ls_var, vol_fcn);
         adv_diff_integrator->setFEDataManagerNeedsInitialization(ib_method_ops->getFEDataManager(REACTION_MESH_ID));
 
@@ -479,7 +481,7 @@ main(int argc, char* argv[])
 
 void
 postprocess_data(Pointer<PatchHierarchy<NDIM>> hierarchy,
-                 Pointer<SemiLagrangianAdvIntegrator> integrator,
+                 Pointer<SBAdvDiffIntegrator> integrator,
                  Pointer<CellVariable<NDIM, double>> Q_in_var,
                  const int iteration_num,
                  const double loop_time,

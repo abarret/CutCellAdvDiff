@@ -1,7 +1,7 @@
 #include "ibamr/config.h"
 
 #include "CCAD/LSCutCellLaplaceOperator.h"
-#include "CCAD/SemiLagrangianAdvIntegrator.h"
+#include "CCAD/SBAdvDiffIntegrator.h"
 
 #include <ibamr/FESurfaceDistanceEvaluator.h>
 #include <ibamr/IBExplicitHierarchyIntegrator.h>
@@ -89,7 +89,7 @@ locateInterface(const int D_idx,
 }
 
 void postprocess_data(Pointer<PatchHierarchy<NDIM>> hierarchy,
-                      Pointer<SemiLagrangianAdvIntegrator> integrator,
+                      Pointer<SBAdvDiffIntegrator> integrator,
                       Pointer<CellVariable<NDIM, double>> Q_in_var,
                       int iteration_num,
                       double loop_time,
@@ -296,10 +296,8 @@ main(int argc, char* argv[])
                                               ib_method_ops,
                                               ins_integrator);
 
-        Pointer<SemiLagrangianAdvIntegrator> adv_diff_integrator = new SemiLagrangianAdvIntegrator(
-            "SemiLagrangianAdvIntegrator",
-            app_initializer->getComponentDatabase("AdvDiffSemiImplicitHierarchyIntegrator"),
-            false);
+        Pointer<SBAdvDiffIntegrator> adv_diff_integrator = new SBAdvDiffIntegrator(
+            "SBAdvDiffIntegrator", app_initializer->getComponentDatabase("SBAdvDiffIntegrator"), false);
 
         ins_integrator->registerAdvDiffHierarchyIntegrator(adv_diff_integrator);
 
@@ -607,7 +605,7 @@ main(int argc, char* argv[])
 
 void
 postprocess_data(Pointer<PatchHierarchy<NDIM>> hierarchy,
-                 Pointer<SemiLagrangianAdvIntegrator> integrator,
+                 Pointer<SBAdvDiffIntegrator> integrator,
                  Pointer<CellVariable<NDIM, double>> Q_in_var,
                  const int iteration_num,
                  const double loop_time,

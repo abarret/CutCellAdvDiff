@@ -328,7 +328,7 @@ TimerManager{
 }
 
 
-AdvDiffSemiImplicitHierarchyIntegrator {
+LSAdvDiffIntegrator {
     start_time           = 0.0e0  // initial simulation time
     end_time             = END_TIME    // final simulation time
     grow_dt              = 2.0e0  // growth factor for timesteps

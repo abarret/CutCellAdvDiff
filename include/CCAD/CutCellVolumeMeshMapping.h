@@ -34,6 +34,20 @@ public:
                              const std::vector<std::shared_ptr<FEMeshPartitioner>>& fe_mesh_paritioners);
 
     /*!
+     * \brief Constructor.
+     */
+    CutCellVolumeMeshMapping(std::string object_name,
+                             SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+                             IBTK::FEDataManager* fe_data_manager);
+
+    /*!
+     * \brief Constructor.
+     */
+    CutCellVolumeMeshMapping(std::string object_name,
+                             SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+                             const std::vector<IBTK::FEDataManager*>& fe_data_managers);
+
+    /*!
      * \brief Default deconstructor.
      */
     virtual ~CutCellVolumeMeshMapping();
@@ -71,10 +85,10 @@ private:
     bool findIntersection(libMesh::Point& p, libMesh::Elem* elem, libMesh::Point r, libMesh::VectorValue<double> q);
 
     std::vector<std::shared_ptr<FEMeshPartitioner>> d_bdry_mesh_partitioners;
+    std::vector<IBTK::FEDataManager*> d_fe_data_managers;
+    unsigned int d_num_parts;
 
     std::vector<MappingFcn> d_mapping_fcns;
-
-    std::vector<std::vector<libMesh::Elem*>> d_active_patch_elem_map;
 };
 
 } // namespace CCAD

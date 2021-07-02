@@ -46,13 +46,6 @@ class LSFromMesh : public LSFindCellVolume
 public:
     LSFromMesh(std::string object_name,
                SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-               const std::shared_ptr<FEMeshPartitioner>& fe_data_manager,
-               const SAMRAI::tbox::Pointer<CutCellMeshMapping>& cut_cell_mesh_mapping,
-               bool use_inside = true);
-
-    LSFromMesh(std::string object_name,
-               SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> hierarchy,
-               const std::vector<std::shared_ptr<FEMeshPartitioner>>& fe_data_managers,
                const SAMRAI::tbox::Pointer<CutCellMeshMapping>& cut_cell_mesh_mapping,
                bool use_inside = true);
 
@@ -115,7 +108,6 @@ private:
     // NOTE: eps must be positive.
     void floodFillForLS(int ln, double eps);
 
-    std::vector<std::shared_ptr<FEMeshPartitioner>> d_fe_mesh_partitioners;
     bool d_use_inside = true;
 
     SAMRAI::tbox::Pointer<CutCellMeshMapping> d_cut_cell_mesh_mapping;

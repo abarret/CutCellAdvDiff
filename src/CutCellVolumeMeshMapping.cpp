@@ -12,7 +12,9 @@ namespace CCAD
 CutCellVolumeMeshMapping::CutCellVolumeMeshMapping(std::string object_name,
                                                    Pointer<Database> input_db,
                                                    const std::shared_ptr<FEMeshPartitioner>& fe_mesh_partitioner)
-    : CutCellMeshMapping(std::move(object_name), input_db), d_bdry_mesh_partitioners({ fe_mesh_partitioner })
+    : CutCellMeshMapping(std::move(object_name), input_db, 1),
+      d_bdry_mesh_partitioners({ fe_mesh_partitioner }),
+      d_num_parts(d_bdry_mesh_partitioners.size())
 {
     commonConstructor(input_db);
 }
@@ -21,7 +23,29 @@ CutCellVolumeMeshMapping::CutCellVolumeMeshMapping(
     std::string object_name,
     Pointer<Database> input_db,
     const std::vector<std::shared_ptr<FEMeshPartitioner>>& fe_mesh_partitioners)
-    : CutCellMeshMapping(std::move(object_name), input_db), d_bdry_mesh_partitioners(fe_mesh_partitioners)
+    : CutCellMeshMapping(std::move(object_name), input_db, fe_mesh_partitioners.size()),
+      d_bdry_mesh_partitioners(fe_mesh_partitioners),
+      d_num_parts(d_bdry_mesh_partitioners.size())
+{
+    commonConstructor(input_db);
+}
+
+CutCellVolumeMeshMapping::CutCellVolumeMeshMapping(std::string object_name,
+                                                   Pointer<Database> input_db,
+                                                   FEDataManager* fe_data_manager)
+    : CutCellMeshMapping(std::move(object_name), input_db, d_fe_data_managers.size()),
+      d_fe_data_managers({ fe_data_manager }),
+      d_num_parts(d_fe_data_managers.size())
+{
+    commonConstructor(input_db);
+}
+
+CutCellVolumeMeshMapping::CutCellVolumeMeshMapping(std::string object_name,
+                                                   Pointer<Database> input_db,
+                                                   const std::vector<FEDataManager*>& fe_data_managers)
+    : CutCellMeshMapping(std::move(object_name), input_db, fe_data_managers.size()),
+      d_fe_data_managers(fe_data_managers),
+      d_num_parts(d_fe_data_managers.size())
 {
     commonConstructor(input_db);
 }
@@ -42,27 +66,46 @@ CutCellVolumeMeshMapping::~CutCellVolumeMeshMapping()
 void
 CutCellVolumeMeshMapping::generateCutCellMappings()
 {
-    for (unsigned int part = 0; part < d_bdry_mesh_partitioners.size(); ++part)
+    for (unsigned int part = 0; part < d_num_parts; ++part)
     {
-        const std::shared_ptr<FEMeshPartitioner>& fe_mesh_partitioner = d_bdry_mesh_partitioners[part];
-        EquationSystems* eq_sys = fe_mesh_partitioner->getEquationSystems();
+        EquationSystems* eq_sys;
+        System* X_sys;
+        FEDataManager::SystemDofMapCache* X_dof_map_cache;
+        const std::vector<std::vector<Elem*>>* active_patch_element_map;
+        int level_num;
+        if (d_bdry_mesh_partitioners.size() > 0)
+        {
+            const std::shared_ptr<FEMeshPartitioner>& fe_mesh_partitioner = d_bdry_mesh_partitioners[part];
+            eq_sys = fe_mesh_partitioner->getEquationSystems();
+            X_sys = &eq_sys->get_system(fe_mesh_partitioner->COORDINATES_SYSTEM_NAME);
+            X_dof_map_cache = fe_mesh_partitioner->getDofMapCache(fe_mesh_partitioner->COORDINATES_SYSTEM_NAME);
+            active_patch_element_map = &fe_mesh_partitioner->getActivePatchElementMap();
+            level_num = fe_mesh_partitioner->getFinestPatchLevelNumber();
+        }
+        else if (d_fe_data_managers.size() > 0)
+        {
+            FEDataManager* fe_data_manager = d_fe_data_managers[part];
+            eq_sys = fe_data_manager->getEquationSystems();
+            X_sys = &eq_sys->get_system(fe_data_manager->COORDINATES_SYSTEM_NAME);
+            X_dof_map_cache = fe_data_manager->getDofMapCache(fe_data_manager->COORDINATES_SYSTEM_NAME);
+            active_patch_element_map = &fe_data_manager->getActivePatchElementMap();
+            level_num = fe_data_manager->getFinestPatchLevelNumber();
+        }
+        else
+        {
+            TBOX_ERROR("Shouldn't reach this statement.\n");
+        }
 
-        System& X_system = eq_sys->get_system(fe_mesh_partitioner->COORDINATES_SYSTEM_NAME);
-        NumericVector<double>* X_vec = X_system.solution.get();
+        NumericVector<double>* X_vec = X_sys->solution.get();
         auto X_petsc_vec = dynamic_cast<PetscVector<double>*>(X_vec);
         TBOX_ASSERT(X_petsc_vec != nullptr);
         const double* const X_local_soln = X_petsc_vec->get_array_read();
-        FEDataManager::SystemDofMapCache& X_dof_map_cache =
-            *fe_mesh_partitioner->getDofMapCache(fe_mesh_partitioner->COORDINATES_SYSTEM_NAME);
 
         // Only changes are needed where the structure lives
-        const int level_num = fe_mesh_partitioner->getFinestPatchLevelNumber();
         Pointer<PatchLevel<NDIM>> level = d_hierarchy->getPatchLevel(level_num);
         const Pointer<CartesianGridGeometry<NDIM>> grid_geom = level->getGridGeometry();
         VectorValue<double> n;
         IBTK::Point x_min, x_max;
-        const std::vector<std::vector<Elem*>>& active_patch_element_map =
-            fe_mesh_partitioner->getActivePatchElementMap();
 
         std::vector<std::map<IndexList, std::vector<CutCellElems>>>& idx_cut_cell_map_vec =
             d_idx_cut_cell_elems_map_vec[level_num];
@@ -72,7 +115,7 @@ CutCellVolumeMeshMapping::generateCutCellMappings()
         for (PatchLevel<NDIM>::Iterator p(level); p; p++, ++local_patch_num)
         {
             Pointer<Patch<NDIM>> patch = level->getPatch(p());
-            const std::vector<Elem*>& patch_elems = active_patch_element_map[local_patch_num];
+            const std::vector<Elem*>& patch_elems = (*active_patch_element_map)[local_patch_num];
             const size_t num_active_patch_elems = patch_elems.size();
             if (num_active_patch_elems == 0) continue;
 
@@ -86,7 +129,7 @@ CutCellVolumeMeshMapping::generateCutCellMappings()
             boost::multi_array<double, 1> Q_node;
             for (const auto& elem : patch_elems)
             {
-                const auto& X_dof_indices = X_dof_map_cache.dof_indices(elem);
+                const auto& X_dof_indices = X_dof_map_cache->dof_indices(elem);
                 IBTK::get_values_for_interpolation(x_node, *X_petsc_vec, X_local_soln, X_dof_indices);
                 const unsigned int n_node = elem->n_nodes();
                 std::vector<libMesh::Point> X_node_cache(n_node), x_node_cache(n_node);

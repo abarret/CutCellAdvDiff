@@ -1,8 +1,8 @@
 #include "ibamr/config.h"
 
+#include "CCAD/LSAdvDiffIntegrator.h"
 #include "CCAD/LSCutCellLaplaceOperator.h"
 #include "CCAD/LSFromLevelSet.h"
-#include "CCAD/SemiLagrangianAdvIntegrator.h"
 
 #include <ibamr/RelaxationLSMethod.h>
 
@@ -34,7 +34,7 @@ static double a = std::numeric_limits<double>::signaling_NaN();
 static double b = std::numeric_limits<double>::signaling_NaN();
 
 void postprocess_data(Pointer<PatchHierarchy<NDIM>> hierarchy,
-                      Pointer<SemiLagrangianAdvIntegrator> integrator,
+                      Pointer<LSAdvDiffIntegrator> integrator,
                       Pointer<CellVariable<NDIM, double>> Q_in_var,
                       Pointer<CellVariable<NDIM, double>> Q_out_var,
                       int iteration_num,
@@ -195,10 +195,8 @@ main(int argc, char* argv[])
         // and, if this is a restarted run, from the restart database.
         Pointer<CartesianGridGeometry<NDIM>> grid_geometry = new CartesianGridGeometry<NDIM>(
             "CartesianGeometry", app_initializer->getComponentDatabase("CartesianGeometry"));
-        Pointer<SemiLagrangianAdvIntegrator> time_integrator = new SemiLagrangianAdvIntegrator(
-            "SemiLagrangianAdvIntegrator",
-            app_initializer->getComponentDatabase("AdvDiffSemiImplicitHierarchyIntegrator"),
-            false);
+        Pointer<LSAdvDiffIntegrator> time_integrator = new LSAdvDiffIntegrator(
+            "LSAdvDiffIntegrator", app_initializer->getComponentDatabase("LSAdvDiffIntegrator"), false);
 
         Pointer<PatchHierarchy<NDIM>> patch_hierarchy = new PatchHierarchy<NDIM>("PatchHierarchy", grid_geometry);
         Pointer<StandardTagAndInitialize<NDIM>> error_detector =
@@ -457,7 +455,7 @@ main(int argc, char* argv[])
 
 void
 postprocess_data(Pointer<PatchHierarchy<NDIM>> hierarchy,
-                 Pointer<SemiLagrangianAdvIntegrator> integrator,
+                 Pointer<LSAdvDiffIntegrator> integrator,
                  Pointer<CellVariable<NDIM, double>> Q_in_var,
                  Pointer<CellVariable<NDIM, double>> Q_out_var,
                  const int iteration_num,

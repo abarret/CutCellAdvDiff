@@ -19,7 +19,9 @@ public:
     /*!
      * \brief Constructor.
      */
-    CutCellMeshMapping(std::string object_name, SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db);
+    CutCellMeshMapping(std::string object_name,
+                       SAMRAI::tbox::Pointer<SAMRAI::tbox::Database> input_db,
+                       unsigned int parts = 0);
 
     /*!
      * \brief Default deconstructor.
@@ -52,10 +54,16 @@ public:
         return d_idx_cut_cell_elems_map_vec[ln];
     }
 
+    inline unsigned int getNumParts()
+    {
+        return d_num_parts;
+    }
+
 protected:
     std::string d_object_name;
     bool d_is_initialized = false;
     bool d_perturb_nodes = false;
+    unsigned int d_num_parts = 0;
 
     SAMRAI::tbox::Pointer<SAMRAI::hier::PatchHierarchy<NDIM>> d_hierarchy;
     std::vector<std::vector<std::map<IndexList, std::vector<CutCellElems>>>> d_idx_cut_cell_elems_map_vec;
