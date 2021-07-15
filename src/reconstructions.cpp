@@ -312,4 +312,19 @@ leastSquaresReconstruction(IBTK::VectorNd x_loc,
     VectorXd x = (Lambda * A).fullPivHouseholderQr().solve(Lambda * U);
     return x(0);
 }
+
+double
+bilinearReconstruction(const VectorNd& x_loc,
+                       const VectorNd& x_ll,
+                       const CellIndex<NDIM>& idx_ll,
+                       const CellData<NDIM, double>& Q_data,
+                       const double* const dx)
+{
+    double q00 = Q_data(idx_ll);
+    double q01 = Q_data(idx_ll + IntVector<NDIM>(0, 1));
+    double q10 = Q_data(idx_ll + IntVector<NDIM>(1, 0));
+    double q11 = Q_data(idx_ll + IntVector<NDIM>(1, 1));
+    return q00 + (q10 - q00) * (x_loc[0] - x_ll[0]) / dx[0] + (q01 - q00) * (x_loc[1] - x_ll[1]) / dx[1] +
+           (q11 - q10 - q01 + q00) * (x_loc[1] - x_ll[1]) * (x_loc[0] - x_ll[0]) / (dx[0] * dx[1]);
+}
 } // namespace Reconstruct

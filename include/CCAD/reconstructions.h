@@ -131,5 +131,10 @@ double leastSquaresReconstruction(IBTK::VectorNd x_loc,
                                   const SAMRAI::tbox::Pointer<SAMRAI::hier::Patch<NDIM>>& patch,
                                   LeastSquaresOrder order);
 
+double bilinearReconstruction(const IBTK::VectorNd& x_loc,
+                              const IBTK::VectorNd& x_ll,
+                              const SAMRAI::pdat::CellIndex<NDIM>& idx_ll,
+                              const SAMRAI::pdat::CellData<NDIM, double>& Q_data,
+                              const double* const dx);
 } // namespace Reconstruct
 #endif

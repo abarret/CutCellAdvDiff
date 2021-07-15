@@ -68,11 +68,11 @@ CutCellVolumeMeshMapping::generateCutCellMappings()
 {
     for (unsigned int part = 0; part < d_num_parts; ++part)
     {
-        EquationSystems* eq_sys;
-        System* X_sys;
-        FEDataManager::SystemDofMapCache* X_dof_map_cache;
-        const std::vector<std::vector<Elem*>>* active_patch_element_map;
-        int level_num;
+        EquationSystems* eq_sys = nullptr;
+        System* X_sys = nullptr;
+        FEDataManager::SystemDofMapCache* X_dof_map_cache = nullptr;
+        const std::vector<std::vector<Elem*>>* active_patch_element_map = nullptr;
+        int level_num = IBTK::invalid_level_number;
         if (d_bdry_mesh_partitioners.size() > 0)
         {
             const std::shared_ptr<FEMeshPartitioner>& fe_mesh_partitioner = d_bdry_mesh_partitioners[part];
